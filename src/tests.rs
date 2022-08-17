@@ -74,9 +74,9 @@ fn basic() {
 
     let wal = WriteAheadLog::recover(&dir, archiver.clone()).unwrap();
     let mut writer = wal.write().unwrap();
-    let write_position = writer.write_all(message).unwrap();
+    let record = writer.write_all(message).unwrap();
     let written_entry_id = writer.commit().unwrap();
-    println!("hello world written to {write_position:?} in {written_entry_id:?}");
+    println!("hello world written to {record:?} in {written_entry_id:?}");
     drop(wal);
 
     let invocations = archiver.invocations.lock();
@@ -103,45 +103,45 @@ fn basic() {
     }
     drop(invocations);
 
-    let mut reader = wal.read_at(write_position).unwrap();
+    let mut reader = wal.read_at(record.position).unwrap();
     let mut buffer = vec![0; message.len()];
     reader.read_exact(&mut buffer).unwrap();
     assert_eq!(buffer, message);
 }
 
-#[test]
-fn multithreaded() {
-    let dir = tempdir_in(".").unwrap();
+// #[test]
+// fn multithreaded() {
+//     let dir = tempdir_in(".").unwrap();
 
-    let archiver = LoggingArchiver::default();
-    let mut threads = Vec::new();
-    let message = b"hello world";
+//     let archiver = LoggingArchiver::default();
+//     let mut threads = Vec::new();
+//     let message = b"hello world";
 
-    let wal = WriteAheadLog::recover(&dir, archiver).unwrap();
+//     let wal = WriteAheadLog::recover(&dir, archiver).unwrap();
 
-    let (measurements, stats) = timings::Timings::new();
+//     let (measurements, stats) = timings::Timings::new();
 
-    for _ in 0..4 {
-        let wal = wal.clone();
-        let measurements = measurements.clone();
-        threads.push(std::thread::spawn(move || {
-            for i in 1..1000 {
-                let timing = measurements.begin("okaywal", "tx");
-                let mut writer = wal.write().unwrap();
-                writer.write_all(message).unwrap();
-                writer.commit().unwrap();
-                timing.finish();
-                println!("Transaction {i} finished");
-            }
-        }));
-    }
-    drop(measurements);
-    drop(wal);
+//     for _ in 0..4 {
+//         let wal = wal.clone();
+//         let measurements = measurements.clone();
+//         threads.push(std::thread::spawn(move || {
+//             for i in 1..1000 {
+//                 let timing = measurements.begin("okaywal", "tx");
+//                 let mut writer = wal.write().unwrap();
+//                 writer.write_all(message).unwrap();
+//                 writer.commit().unwrap();
+//                 timing.finish();
+//                 println!("Transaction {i} finished");
+//             }
+//         }));
+//     }
+//     drop(measurements);
+//     drop(wal);
 
-    for thread in threads {
-        thread.join().unwrap();
-    }
+//     for thread in threads {
+//         thread.join().unwrap();
+//     }
 
-    let results = stats.join().unwrap();
-    timings::print_table_summaries(&results).unwrap();
-}
+//     let results = stats.join().unwrap();
+//     timings::print_table_summaries(&results).unwrap();
+// }

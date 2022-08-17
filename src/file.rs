@@ -93,6 +93,13 @@ impl AnyFileManager {
             AnyFileManager::Memory(_) => Ok(()),
         }
     }
+
+    pub fn create_dir_recursive(&self, path: &Path) -> io::Result<()> {
+        if let AnyFileManager::Std = self {
+            return std::fs::create_dir_all(path);
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug)]

@@ -41,31 +41,35 @@ impl WriteAheadLog {
         let directory = directory.as_ref().to_path_buf();
 
         let mut segments = SegmentFiles::default();
-        for id in 0..=u16::MAX {
-            let path = directory.join(format!("wal{id}"));
+        if directory.exists() {
+            for id in 0..=u16::MAX {
+                let path = directory.join(format!("wal{id}"));
 
-            if config.file_manager.path_exists(&path) {
-                let file = OpenOptions::new()
-                    .write(true)
-                    .create(true)
-                    .read(true)
-                    .open(&path)?;
+                if config.file_manager.path_exists(&path) {
+                    let file = OpenOptions::new()
+                        .write(true)
+                        .create(true)
+                        .read(true)
+                        .open(&path)?;
 
-                let length = file.metadata()?.len();
-                segments.slots.push(FileSlot {
-                    path: Arc::new(path),
-                    first_entry_id: None,
-                    latest_entry_id: None,
-                    writer: Some(AnyFile {
-                        length: Some(length),
-                        position: 0,
-                        file: AnyFileKind::Std { file },
-                    }),
-                    active: false,
-                });
-            } else {
-                break;
+                    let length = file.metadata()?.len();
+                    segments.slots.push(FileSlot {
+                        path: Arc::new(path),
+                        first_entry_id: None,
+                        latest_entry_id: None,
+                        writer: Some(AnyFile {
+                            length: Some(length),
+                            position: 0,
+                            file: AnyFileKind::Std { file },
+                        }),
+                        active: false,
+                    });
+                } else {
+                    break;
+                }
             }
+        } else {
+            config.file_manager.create_dir_recursive(&directory)?;
         }
 
         let latest_entry_id = Self::recover_files(&mut segments, &mut archiver, &config)?;
@@ -598,7 +602,7 @@ impl LogWriter {
         Ok(self.entry_id)
     }
 
-    pub fn write_all(&mut self, data: &[u8]) -> io::Result<LogPosition> {
+    pub fn write_all(&mut self, data: &[u8]) -> io::Result<DataRecord> {
         let length = u32::try_from(data.len()).to_io()?;
         let position = self.position()?;
         let file = self.file.as_mut().expect("already dropped");
@@ -624,7 +628,11 @@ impl LogWriter {
 
         self.bytes_written += 9 + u64::from(length);
 
-        Ok(position)
+        Ok(DataRecord {
+            position,
+            crc,
+            length,
+        })
     }
 
     pub fn position(&self) -> io::Result<LogPosition> {
@@ -668,6 +676,13 @@ impl Drop for LogWriter {
 pub struct LogPosition {
     slot_id: u16,
     offset: u64,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub struct DataRecord {
+    pub position: LogPosition,
+    pub crc: u32,
+    pub length: u32,
 }
 
 trait ToIoResult<T> {
