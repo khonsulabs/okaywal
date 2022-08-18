@@ -2,10 +2,12 @@ use std::{
     collections::HashMap,
     fs::{File, OpenOptions},
     io::{self, ErrorKind, Read, Seek, Write},
+    ops::{Deref, DerefMut},
     path::{Path, PathBuf},
     sync::Arc,
 };
 
+use fs2::FileExt;
 use parking_lot::{Mutex, RwLock};
 
 use crate::ToIoResult;
@@ -167,6 +169,20 @@ impl AnyFile {
             AnyFileKind::Memory(_) => Ok(()),
         }
     }
+
+    pub fn lock_exclusive(&self) -> io::Result<()> {
+        match &self.file {
+            AnyFileKind::Std { file } => file.lock_exclusive(),
+            AnyFileKind::Memory(_) => Ok(()),
+        }
+    }
+
+    pub fn unlock(&self) -> io::Result<()> {
+        match &self.file {
+            AnyFileKind::Std { file } => file.unlock(),
+            AnyFileKind::Memory(_) => Ok(()),
+        }
+    }
 }
 
 impl Write for AnyFile {
@@ -224,5 +240,55 @@ impl Read for AnyFile {
         self.position += u64::try_from(bytes_read).to_io()?;
 
         Ok(bytes_read)
+    }
+}
+
+#[derive(Debug)]
+pub struct LockedFile {
+    file: AnyFile,
+    locked: bool,
+}
+
+impl LockedFile {
+    pub fn new(file: AnyFile) -> Self {
+        let locked = file.lock_exclusive().is_ok();
+        Self { file, locked }
+    }
+}
+
+impl Drop for LockedFile {
+    fn drop(&mut self) {
+        if self.locked {
+            let _ = self.file.unlock();
+        }
+    }
+}
+
+impl Deref for LockedFile {
+    type Target = AnyFile;
+    fn deref(&self) -> &Self::Target {
+        &self.file
+    }
+}
+
+impl DerefMut for LockedFile {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.file
+    }
+}
+
+impl Write for LockedFile {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.file.write(buf)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.file.flush()
+    }
+}
+
+impl Seek for LockedFile {
+    fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
+        self.file.seek(pos)
     }
 }

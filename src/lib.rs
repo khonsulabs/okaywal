@@ -17,7 +17,7 @@ use file::AnyFile;
 use parking_lot::{Condvar, Mutex};
 use watchable::{Watchable, Watcher};
 
-use crate::file::{AnyFileKind, AnyFileManager};
+use crate::file::{AnyFileKind, AnyFileManager, LockedFile};
 
 #[derive(Debug, Clone)]
 pub struct WriteAheadLog {
@@ -57,11 +57,11 @@ impl WriteAheadLog {
                         path: Arc::new(path),
                         first_entry_id: None,
                         latest_entry_id: None,
-                        writer: Some(AnyFile {
+                        writer: Some(LockedFile::new(AnyFile {
                             length: Some(length),
                             position: 0,
                             file: AnyFileKind::Std { file },
-                        }),
+                        })),
                         active: false,
                     });
                 } else {
@@ -131,7 +131,8 @@ impl WriteAheadLog {
 
                 let slot_id = segments.slots.len();
                 let path = self.data.directory.join(format!("wal{slot_id}"));
-                let mut file = self.data.config.file_manager.append_to_path(&path)?;
+                let mut file =
+                    LockedFile::new(self.data.config.file_manager.append_to_path(&path)?);
 
                 self.data.config.write_segment_header(&mut file)?;
 
@@ -163,7 +164,7 @@ impl WriteAheadLog {
     fn reclaim(
         &self,
         slot_id: u16,
-        file: AnyFile,
+        file: LockedFile,
         written_entry: Option<EntryId>,
         bytes_written: Option<u64>,
     ) -> io::Result<()> {
@@ -311,6 +312,7 @@ impl WriteAheadLog {
             let writer = slot.writer.as_mut().unwrap();
             if slot.first_entry_id.is_none() {
                 writer.set_len(0)?;
+                writer.seek(SeekFrom::Start(0))?;
                 config.write_segment_header(writer)?;
             } else if writer.len()? != reader.valid_until {
                 writer.set_len(reader.valid_until)?;
@@ -362,6 +364,7 @@ impl WriteAheadLog {
                 let writer = slot.writer.as_mut().unwrap();
                 // TODO error handling?
                 writer.set_len(0).unwrap();
+                writer.seek(SeekFrom::Start(0)).unwrap();
                 data.config.write_segment_header(writer).unwrap();
                 slot.first_entry_id = None;
                 slot.latest_entry_id = None;
@@ -485,6 +488,12 @@ impl<'chunk, 'entry> EntryData<'chunk, 'entry> {
             Some(self.stored_crc == self.calculated_crc)
         }
     }
+
+    pub fn read_all(&mut self) -> io::Result<Vec<u8>> {
+        let mut data = Vec::with_capacity(usize::try_from(self.bytes_remaining).to_io()?);
+        self.read_to_end(&mut data)?;
+        Ok(data)
+    }
 }
 
 impl<'chunk, 'entry> Read for EntryData<'chunk, 'entry> {
@@ -540,7 +549,7 @@ struct FileSlot {
     path: Arc<PathBuf>,
     first_entry_id: Option<EntryId>,
     latest_entry_id: Option<EntryId>,
-    writer: Option<AnyFile>,
+    writer: Option<LockedFile>,
     active: bool,
 }
 
@@ -561,7 +570,7 @@ pub struct LogWriter {
     pub entry_id: EntryId,
     log: WriteAheadLog,
     slot_id: u16,
-    file: Option<BufWriter<AnyFile>>,
+    file: Option<BufWriter<LockedFile>>,
     original_file_length: u64,
     bytes_written: u64,
 }
@@ -570,7 +579,7 @@ const NEW_ENTRY: u8 = 1;
 const CHUNK: u8 = 2;
 
 impl LogWriter {
-    fn new(log: WriteAheadLog, slot_id: u16, file: AnyFile) -> io::Result<Self> {
+    fn new(log: WriteAheadLog, slot_id: u16, file: LockedFile) -> io::Result<Self> {
         let entry_id = EntryId(log.data.next_entry_id.fetch_add(1, Ordering::SeqCst));
         let original_file_length = file.len()?;
         let mut file = BufWriter::new(file);

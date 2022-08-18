@@ -60,8 +60,7 @@ impl Archiver for LoggingArchiver {
     fn recover(&mut self, entry: &mut Entry<'_>) -> io::Result<()> {
         let mut all_data = Vec::new();
         while let Some(mut chunk) = entry.read_chunk()? {
-            let mut data = Vec::new();
-            chunk.read_to_end(&mut data)?;
+            let data = chunk.read_all()?;
             all_data.push(String::from_utf8(data).expect("invalid utf-8"));
         }
 

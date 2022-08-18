@@ -1,7 +1,7 @@
-use std::{io::Read, sync::Arc};
+use std::{collections::BTreeMap, io::Read, iter::repeat_with, sync::Arc};
 
 use parking_lot::Mutex;
-use tempfile::{tempdir, tempdir_in};
+use tempfile::tempdir;
 
 use crate::{Archiver, Entry, EntryId, Recovery, WriteAheadLog};
 
@@ -43,8 +43,7 @@ impl Archiver for LoggingArchiver {
         let mut invocations = self.invocations.lock();
         let mut chunks = Vec::new();
         while let Some(mut chunk) = entry.read_chunk()? {
-            let mut data = Vec::new();
-            chunk.read_to_end(&mut data)?;
+            let data = chunk.read_all()?;
             assert!(chunk.check_crc().expect("data should be finished"));
             chunks.push(data);
         }
@@ -109,39 +108,88 @@ fn basic() {
     assert_eq!(buffer, message);
 }
 
-// #[test]
-// fn multithreaded() {
-//     let dir = tempdir_in(".").unwrap();
+#[derive(Debug, Default)]
+struct VerifyingArchiver {
+    entries: Arc<Mutex<BTreeMap<EntryId, Vec<Vec<u8>>>>>,
+}
 
-//     let archiver = LoggingArchiver::default();
-//     let mut threads = Vec::new();
-//     let message = b"hello world";
+impl Archiver for VerifyingArchiver {
+    fn should_recover_segment(
+        &mut self,
+        _segment: &crate::RecoveredSegment,
+    ) -> std::io::Result<Recovery> {
+        Ok(Recovery::Recover)
+    }
 
-//     let wal = WriteAheadLog::recover(&dir, archiver).unwrap();
+    fn recover(&mut self, entry: &mut Entry<'_>) -> std::io::Result<()> {
+        let mut messages = Vec::new();
+        while let Some(mut chunk) = entry.read_chunk()? {
+            messages.push(chunk.read_all()?);
+        }
 
-//     let (measurements, stats) = timings::Timings::new();
+        let mut entries = self.entries.lock();
+        entries.insert(entry.id, messages);
 
-//     for _ in 0..4 {
-//         let wal = wal.clone();
-//         let measurements = measurements.clone();
-//         threads.push(std::thread::spawn(move || {
-//             for i in 1..1000 {
-//                 let timing = measurements.begin("okaywal", "tx");
-//                 let mut writer = wal.write().unwrap();
-//                 writer.write_all(message).unwrap();
-//                 writer.commit().unwrap();
-//                 timing.finish();
-//                 println!("Transaction {i} finished");
-//             }
-//         }));
-//     }
-//     drop(measurements);
-//     drop(wal);
+        Ok(())
+    }
 
-//     for thread in threads {
-//         thread.join().unwrap();
-//     }
+    fn archive(&mut self, last_archived_id: EntryId) -> std::io::Result<()> {
+        println!("Archiving through {last_archived_id:?}");
+        let mut entries = self.entries.lock();
+        entries.retain(|entry_id, _| *entry_id > last_archived_id);
+        Ok(())
+    }
+}
 
-//     let results = stats.join().unwrap();
-//     timings::print_table_summaries(&results).unwrap();
-// }
+#[test]
+fn multithreaded() {
+    let dir = tempdir().unwrap();
+
+    let mut threads = Vec::new();
+
+    let archiver = VerifyingArchiver::default();
+    let original_entries = archiver.entries.clone();
+    let wal = WriteAheadLog::recover(&dir, archiver).unwrap();
+
+    for _ in 0..8 {
+        let wal = wal.clone();
+        let written_entries = original_entries.clone();
+        threads.push(std::thread::spawn(move || {
+            let rng = fastrand::Rng::new();
+            for _ in 1..250 {
+                let mut messages = Vec::with_capacity(rng.usize(1..=8));
+                let mut writer = wal.write().unwrap();
+                for _ in 0..messages.capacity() {
+                    let message = repeat_with(|| rng.u8(..))
+                        .take(rng.usize(..65_536))
+                        .collect::<Vec<_>>();
+                    writer.write_all(&message).unwrap();
+                    messages.push(message);
+                }
+                let entry_id = writer.commit().unwrap();
+                let mut entries = written_entries.lock();
+                entries.insert(entry_id, messages);
+            }
+        }));
+    }
+    drop(wal);
+
+    for thread in threads {
+        thread.join().unwrap();
+    }
+
+    println!("Reopening log");
+
+    let archiver = VerifyingArchiver::default();
+    let recovered_entries = archiver.entries.clone();
+    let _wal = WriteAheadLog::recover(&dir, archiver).unwrap();
+    let recovered_entries = recovered_entries.lock();
+    let original_entries = original_entries.lock();
+    // Check keys first because it's easier to verify a list of ids than it is
+    // to look at debug output of a bunch of bytes.
+    assert_eq!(
+        original_entries.keys().collect::<Vec<_>>(),
+        recovered_entries.keys().collect::<Vec<_>>()
+    );
+    assert_eq!(&*original_entries, &*recovered_entries);
+}
