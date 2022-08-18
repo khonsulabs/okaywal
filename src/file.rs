@@ -1,6 +1,6 @@
 use std::{
     collections::HashMap,
-    fs::{File, OpenOptions},
+    fs::{self, OpenOptions},
     io::{self, ErrorKind, Read, Seek, Write},
     ops::{Deref, DerefMut},
     path::{Path, PathBuf},
@@ -13,38 +13,38 @@ use parking_lot::{Mutex, RwLock};
 use crate::ToIoResult;
 
 #[derive(Debug, Clone)]
-pub enum AnyFileManager {
+pub enum FileManager {
     Std,
     Memory(MemoryFiles),
 }
 
-impl AnyFileManager {
+impl FileManager {
     pub fn path_exists(&self, path: &Path) -> bool {
         match self {
-            AnyFileManager::Std => path.exists(),
-            AnyFileManager::Memory(files) => {
+            FileManager::Std => path.exists(),
+            FileManager::Memory(files) => {
                 let files = files.0.lock();
                 files.contains_key(path)
             }
         }
     }
 
-    pub fn append_to_path(&self, path: &Path) -> io::Result<AnyFile> {
+    pub fn append_to_path(&self, path: &Path) -> io::Result<File> {
         match self {
-            AnyFileManager::Std => {
+            FileManager::Std => {
                 let file = OpenOptions::new()
                     .create(true)
                     .read(true)
                     .write(true)
                     .open(&path)?;
                 let length = file.metadata()?.len();
-                Ok(AnyFile {
+                Ok(File {
                     length: Some(length),
                     position: 0,
                     file: AnyFileKind::Std { file },
                 })
             }
-            AnyFileManager::Memory(files) => {
+            FileManager::Memory(files) => {
                 let mut files = files.0.lock();
 
                 let file = files.entry(path.to_path_buf()).or_default().clone();
@@ -52,7 +52,7 @@ impl AnyFileManager {
                 let length = u64::try_from(data.len()).to_io()?;
                 drop(data);
 
-                Ok(AnyFile {
+                Ok(File {
                     length: Some(length),
                     position: 0,
                     file: AnyFileKind::Memory(file),
@@ -61,20 +61,20 @@ impl AnyFileManager {
         }
     }
 
-    pub fn read_path(&self, path: &Path) -> io::Result<AnyFile> {
+    pub fn read_path(&self, path: &Path) -> io::Result<File> {
         match self {
-            AnyFileManager::Std => {
+            FileManager::Std => {
                 let file = OpenOptions::new().read(true).open(&path)?;
-                Ok(AnyFile {
+                Ok(File {
                     length: None,
                     position: 0,
                     file: AnyFileKind::Std { file },
                 })
             }
-            AnyFileManager::Memory(files) => {
+            FileManager::Memory(files) => {
                 let files = files.0.lock();
                 if let Some(file) = files.get(path) {
-                    Ok(AnyFile {
+                    Ok(File {
                         length: None,
                         position: 0,
                         file: AnyFileKind::Memory(file.clone()),
@@ -88,16 +88,16 @@ impl AnyFileManager {
 
     pub fn synchronize_path(&self, path: &Path) -> io::Result<()> {
         match self {
-            AnyFileManager::Std => {
+            FileManager::Std => {
                 let file = OpenOptions::new().read(true).open(path)?;
                 file.sync_all()
             }
-            AnyFileManager::Memory(_) => Ok(()),
+            FileManager::Memory(_) => Ok(()),
         }
     }
 
     pub fn create_dir_recursive(&self, path: &Path) -> io::Result<()> {
-        if let AnyFileManager::Std = self {
+        if let FileManager::Std = self {
             return std::fs::create_dir_all(path);
         }
         Ok(())
@@ -105,7 +105,7 @@ impl AnyFileManager {
 }
 
 #[derive(Debug)]
-pub struct AnyFile {
+pub struct File {
     pub length: Option<u64>,
     pub position: u64,
     pub file: AnyFileKind,
@@ -113,11 +113,11 @@ pub struct AnyFile {
 
 #[derive(Debug)]
 pub enum AnyFileKind {
-    Std { file: File },
+    Std { file: fs::File },
     Memory(MemoryFile),
 }
 
-impl AnyFile {
+impl File {
     pub fn memory() -> Self {
         Self {
             length: None,
@@ -130,7 +130,7 @@ impl AnyFile {
 #[derive(Debug, Clone, Default)]
 pub struct MemoryFile(Arc<RwLock<Vec<u8>>>);
 
-impl AnyFile {
+impl File {
     pub fn len(&self) -> io::Result<u64> {
         if let Some(length) = self.length {
             Ok(length)
@@ -185,7 +185,7 @@ impl AnyFile {
     }
 }
 
-impl Write for AnyFile {
+impl Write for File {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         let bytes_written = match &mut self.file {
             AnyFileKind::Std { file } => match file.write(buf) {
@@ -216,7 +216,7 @@ impl Write for AnyFile {
     }
 }
 
-impl Seek for AnyFile {
+impl Seek for File {
     fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
         self.position = match &mut self.file {
             AnyFileKind::Std { file } => file.seek(pos)?,
@@ -230,7 +230,7 @@ impl Seek for AnyFile {
 #[derive(Clone, Debug)]
 pub struct MemoryFiles(Arc<Mutex<HashMap<PathBuf, MemoryFile>>>);
 
-impl Read for AnyFile {
+impl Read for File {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         let bytes_read = match &mut self.file {
             AnyFileKind::Std { file } => file.read(buf)?,
@@ -245,12 +245,12 @@ impl Read for AnyFile {
 
 #[derive(Debug)]
 pub struct LockedFile {
-    file: AnyFile,
+    file: File,
     locked: bool,
 }
 
 impl LockedFile {
-    pub fn new(file: AnyFile) -> Self {
+    pub fn new(file: File) -> Self {
         let locked = file.lock_exclusive().is_ok();
         Self { file, locked }
     }
@@ -259,13 +259,13 @@ impl LockedFile {
 impl Drop for LockedFile {
     fn drop(&mut self) {
         if self.locked {
-            let _ = self.file.unlock();
+            drop(self.file.unlock());
         }
     }
 }
 
 impl Deref for LockedFile {
-    type Target = AnyFile;
+    type Target = File;
     fn deref(&self) -> &Self::Target {
         &self.file
     }

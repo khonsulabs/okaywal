@@ -1,31 +1,31 @@
 use std::io::{self, Read};
 
-use okaywal::{Archiver, Entry, EntryId, RecoveredSegment, Recovery, WriteAheadLog};
+use okaywal::{Checkpointer, Entry, EntryId, RecoveredSegment, Recovery, WriteAheadLog};
 
 fn main() -> io::Result<()> {
-    // Open a log using an Archiver that echoes the information passed into each
-    // function that the Archiver trait defines.
-    let log = WriteAheadLog::recover("my-log", LoggingArchiver)?;
+    // Open a log using an Checkpointer that echoes the information passed into each
+    // function that the Checkpointer trait defines.
+    let log = WriteAheadLog::recover("my-log", LoggingCheckpointer)?;
 
     // Begin writing an entry to the log.
     let mut writer = log.write()?;
 
     // Each entry is one or more chunks of data. Each chunk can be individually
     // addressed using its LogPosition.
-    let record = writer.write_all("this is the first entry".as_bytes())?;
+    let record = writer.write_chunk("this is the first entry".as_bytes())?;
 
     // To fully flush all written bytes to disk and make the new entry
     // resilliant to a crash, the writer must be committed.
     writer.commit()?;
 
     // Let's reopen the log. During this process,
-    // LoggingArchiver::should_recover_segment will be invoked for each segment
-    // file that has not been archived yet. In this example, it will be called
-    // once. Once the Archiver confirms the data should be recovered,
-    // LoggingArchiver::recover will be invoked once for each entry in the WAL
-    // that hasn't been previously archived.
+    // LoggingCheckpointer::should_recover_segment will be invoked for each segment
+    // file that has not been checkpointed yet. In this example, it will be called
+    // once. Once the Checkpointer confirms the data should be recovered,
+    // LoggingCheckpointer::recover will be invoked once for each entry in the WAL
+    // that hasn't been previously checkpointed.
     drop(log);
-    let log = WriteAheadLog::recover("my-log", LoggingArchiver)?;
+    let log = WriteAheadLog::recover("my-log", LoggingCheckpointer)?;
 
     // We can use the previously returned DataRecord to read the original data.
     let mut reader = log.read_at(record.position)?;
@@ -45,12 +45,12 @@ fn main() -> io::Result<()> {
 }
 
 #[derive(Debug)]
-struct LoggingArchiver;
+struct LoggingCheckpointer;
 
-impl Archiver for LoggingArchiver {
+impl Checkpointer for LoggingCheckpointer {
     fn should_recover_segment(&mut self, segment: &RecoveredSegment) -> io::Result<Recovery> {
         println!(
-            "LogingArchiver::should_recover_segment({:?})",
+            "LoggingCheckpointer::should_recover_segment({:?})",
             segment.version_info
         );
 
@@ -65,15 +65,16 @@ impl Archiver for LoggingArchiver {
         }
 
         println!(
-            "LogingArchiver::recover(entry_id: {:?}, data: {:?})",
-            entry.id, all_data,
+            "LoggingCheckpointer::recover(entry_id: {:?}, data: {:?})",
+            entry.id(),
+            all_data,
         );
 
         Ok(())
     }
 
-    fn archive(&mut self, last_archived_id: EntryId) -> io::Result<()> {
-        println!("LogingArchiver::recover({last_archived_id:?}");
+    fn checkpoint_to(&mut self, last_checkpointed_id: EntryId) -> io::Result<()> {
+        println!("LoggingCheckpointer::recover({last_checkpointed_id:?}");
         Ok(())
     }
 }

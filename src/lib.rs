@@ -1,3 +1,18 @@
+#![doc = include_str!("../README.md")]
+#![forbid(unsafe_code)]
+#![warn(
+    clippy::cargo,
+    missing_docs,
+    clippy::pedantic,
+    future_incompatible,
+    rust_2018_idioms
+)]
+#![allow(
+    clippy::option_if_let_else,
+    clippy::module_name_repetitions,
+    clippy::missing_errors_doc
+)]
+
 mod file;
 
 use std::{
@@ -13,29 +28,44 @@ use std::{
     },
 };
 
-use file::AnyFile;
+use file::File;
 use parking_lot::{Condvar, Mutex};
 use watchable::{Watchable, Watcher};
 
-use crate::file::{AnyFileKind, AnyFileManager, LockedFile};
+use crate::file::{AnyFileKind, FileManager, LockedFile};
 
+/// A Write-Ahead Log that enables atomic, durable writes.
 #[derive(Debug, Clone)]
 pub struct WriteAheadLog {
     data: Arc<Data>,
 }
 
 impl WriteAheadLog {
+    /// Creates or recovers a log stored in `directory` using the default
+    /// [`Config`].
+    ///
+    /// # Errors
+    ///
+    /// Returns various errors if the log is unable to be successfully
+    /// recovered.
     pub fn recover(
         directory: impl AsRef<Path>,
-        archiver: impl Archiver + 'static,
+        checkpointer: impl Checkpointer + 'static,
     ) -> io::Result<Self> {
-        Self::recover_with_config(directory, archiver, Config::default())
+        Self::recover_with_config(directory, checkpointer, Configuration::default())
     }
 
+    /// Creates or recovers a log stored in `directory` using the provided
+    /// configuration.
+    ///
+    /// # Errors
+    ///
+    /// Returns various errors if the log is unable to be successfully
+    /// recovered.
     pub fn recover_with_config(
         directory: impl AsRef<Path>,
-        mut archiver: impl Archiver + 'static,
-        config: Config,
+        mut checkpointer: impl Checkpointer + 'static,
+        config: Configuration,
     ) -> io::Result<Self> {
         config.validate()?;
         let directory = directory.as_ref().to_path_buf();
@@ -57,7 +87,7 @@ impl WriteAheadLog {
                         path: Arc::new(path),
                         first_entry_id: None,
                         latest_entry_id: None,
-                        writer: Some(LockedFile::new(AnyFile {
+                        writer: Some(LockedFile::new(File {
                             length: Some(length),
                             position: 0,
                             file: AnyFileKind::Std { file },
@@ -72,7 +102,7 @@ impl WriteAheadLog {
             config.file_manager.create_dir_recursive(&directory)?;
         }
 
-        let latest_entry_id = Self::recover_files(&mut segments, &mut archiver, &config)?;
+        let latest_entry_id = Self::recover_files(&mut segments, &mut checkpointer, &config)?;
 
         segments.segment_sync_index =
             u16::try_from(segments.slots.len().saturating_sub(1)).to_io()?;
@@ -84,24 +114,32 @@ impl WriteAheadLog {
                 next_entry_id: AtomicU64::new(latest_entry_id.0 + 1),
                 directory,
                 config,
-                archiver: Mutex::new(Box::new(archiver)),
+                checkpointer: Mutex::new(Box::new(checkpointer)),
                 segments: Mutex::new(segments),
                 segments_sync: Condvar::new(),
                 dirsync_sync: Condvar::new(),
-                archive_sync: Condvar::new(),
-                archive_to_sender: watchable,
+                checkpoint_sync: Condvar::new(),
+                checkpoint_to_sender: watchable,
             }),
         };
         let thread_wal = Arc::downgrade(&wal.data);
         std::thread::Builder::new()
             .name(String::from("okaywal-cp"))
-            .spawn(move || Self::archive_loop(thread_wal, watcher))
+            .spawn(move || Self::checkpoint_loop(&thread_wal, watcher))
             .expect("thread spawn failed");
 
         Ok(wal)
     }
 
-    pub fn write(&self) -> io::Result<LogWriter> {
+    /// Opens the log for writing. The entry written by the returned
+    /// [`EntryWriter`] is ordered in the log at the time of creation and will be
+    /// recovered in the same order.
+    ///
+    /// # Errors
+    ///
+    /// Returns various errors that may occur while acquiring a log segment to
+    /// write into.
+    pub fn write(&self) -> io::Result<EntryWriter> {
         let mut segments = self.data.segments.lock();
 
         loop {
@@ -111,7 +149,7 @@ impl WriteAheadLog {
                     .take()
                     .expect("missing file");
 
-                return LogWriter::new(self.clone(), slot_id, file);
+                return EntryWriter::new(self.clone(), slot_id, file);
             } else if segments.active_slot_count < self.data.config.active_segment_limit {
                 if let Some((slot_id, slot)) = segments
                     .slots
@@ -123,7 +161,7 @@ impl WriteAheadLog {
                     slot.active = true;
                     segments.active_slot_count += 1;
 
-                    return LogWriter::new(self.clone(), u16::try_from(slot_id).to_io()?, file);
+                    return EntryWriter::new(self.clone(), u16::try_from(slot_id).to_io()?, file);
                 }
 
                 // Open a new segment file
@@ -144,14 +182,22 @@ impl WriteAheadLog {
                     active: true,
                 });
 
-                return LogWriter::new(self.clone(), u16::try_from(slot_id).to_io()?, file);
-            } else {
-                self.data.segments_sync.wait(&mut segments);
+                return EntryWriter::new(self.clone(), u16::try_from(slot_id).to_io()?, file);
             }
+
+            self.data.segments_sync.wait(&mut segments);
         }
     }
 
-    pub fn read_at(&self, position: LogPosition) -> io::Result<AnyFile> {
+    /// Opens the log to read previously written data.
+    ///
+    /// # Errors
+    ///
+    /// May error if:
+    ///
+    /// - The file cannot be read.
+    /// - The position refers to data that has been checkpointed.
+    pub fn read_at(&self, position: LogPosition) -> io::Result<File> {
         let segments = self.data.segments.lock();
         let path = segments.slots[usize::from(position.slot_id)].path.clone();
         drop(segments);
@@ -207,27 +253,27 @@ impl WriteAheadLog {
             }
             segments.slots[slot_index].latest_entry_id = Some(entry_id);
 
-            segments.unarchived_bytes += bytes_written;
-            if segments.unarchived_bytes >= self.data.config.archive_after_bytes {
-                segments.unarchived_bytes = 0;
-                self.data.archive_to_sender.replace(entry_id);
+            segments.uncheckpointed_bytes += bytes_written;
+            if segments.uncheckpointed_bytes >= self.data.config.checkpoint_after_bytes {
+                segments.uncheckpointed_bytes = 0;
+                self.data.checkpoint_to_sender.replace(entry_id);
                 segments.remove_segments_for_archiving(entry_id);
             }
         }
 
-        let archive_to = *self.data.archive_to_sender.write();
+        let checkpoint_to = *self.data.checkpoint_to_sender.write();
         let segment_made_available = if segments.slots[slot_index].first_entry_id.is_some()
-            && segments.slots[slot_index].first_entry_id.unwrap() <= archive_to
+            && segments.slots[slot_index].first_entry_id.unwrap() <= checkpoint_to
         {
             segments.slots[slot_index].active = false;
             segments.active_slot_count -= 1;
             let latest_id = segments.slots[slot_index]
                 .latest_entry_id
                 .expect("always present if first_entry_id is");
-            if archive_to < latest_id {
-                self.data.archive_to_sender.replace(latest_id);
+            if checkpoint_to < latest_id {
+                self.data.checkpoint_to_sender.replace(latest_id);
 
-                segments.remove_segments_for_archiving(archive_to);
+                segments.remove_segments_for_archiving(checkpoint_to);
             }
             false
         } else {
@@ -240,16 +286,16 @@ impl WriteAheadLog {
         if segment_made_available {
             self.data.segments_sync.notify_one();
         } else {
-            self.data.archive_sync.notify_one();
+            self.data.checkpoint_sync.notify_one();
         }
 
         Ok(())
     }
 
-    fn recover_files<A: Archiver>(
+    fn recover_files<A: Checkpointer>(
         files: &mut SegmentFiles,
-        archiver: &mut A,
-        config: &Config,
+        checkpointer: &mut A,
+        config: &Configuration,
     ) -> io::Result<EntryId> {
         let mut readers = Vec::with_capacity(files.slots.len());
         let mut completed_readers = Vec::with_capacity(files.slots.len());
@@ -257,7 +303,7 @@ impl WriteAheadLog {
         for (index, slot) in files.slots.iter().enumerate() {
             let file = config.file_manager.read_path(&slot.path)?;
             let reader = SegmentReader::new(index, file)?;
-            match archiver.should_recover_segment(&reader.header)? {
+            match checkpointer.should_recover_segment(&reader.header)? {
                 Recovery::Recover => {
                     readers.push(reader);
                 }
@@ -290,7 +336,7 @@ impl WriteAheadLog {
             if let Some(lowest_entry_reader) = lowest_entry_reader {
                 let reader = &mut readers[lowest_entry_reader];
 
-                archiver.recover(&mut Entry {
+                checkpointer.recover(&mut Entry {
                     id: reader.current_entry_id.unwrap(),
                     reader,
                 })?;
@@ -303,7 +349,7 @@ impl WriteAheadLog {
             }
         }
 
-        // We've now informed the archiver of all commits, we need to clean up
+        // We've now informed the checkpointer of all commits, we need to clean up
         // the files (truncating any invalid data) and enqueue them.
         for reader in completed_readers {
             let slot = &mut files.slots[reader.slot_index];
@@ -329,37 +375,37 @@ impl WriteAheadLog {
         Ok(EntryId(latest_entry_id))
     }
 
-    fn archive_loop(data: Weak<Data>, mut archive_to: Watcher<EntryId>) {
-        for mut entry_to_archive_to in &mut archive_to {
+    fn checkpoint_loop(data: &Weak<Data>, mut checkpoint_to: Watcher<EntryId>) {
+        for mut entry_to_checkpoint_to in &mut checkpoint_to {
             let data = if let Some(data) = data.upgrade() {
                 data
             } else {
-                // The final instance was dropped before we could archive.
+                // The final instance was dropped before we could checkpoint.
                 break;
             };
 
             let mut segments = data.segments.lock();
             // Wait for all outstanding files that have an EntryId that is <=
-            // entry_to_archive_to
+            // entry_to_checkpoint_to
             while !segments
                 .slots
                 .iter()
-                .all(|slot| slot.can_archive_if_needed(entry_to_archive_to))
+                .all(|slot| slot.can_checkpoint_if_needed(entry_to_checkpoint_to))
             {
-                data.archive_sync.wait(&mut segments);
+                data.checkpoint_sync.wait(&mut segments);
                 // Other files may have been returned that need to be
-                // archived but have a later entry id.
-                entry_to_archive_to = *data.archive_to_sender.write();
+                // checkpointed but have a later entry id.
+                entry_to_checkpoint_to = *data.checkpoint_to_sender.write();
             }
 
-            let mut archiver = data.archiver.lock();
+            let mut checkpointer = data.checkpointer.lock();
             // TODO error handling?
-            archiver.archive(entry_to_archive_to).unwrap();
+            checkpointer.checkpoint_to(entry_to_checkpoint_to).unwrap();
 
             for slot in segments
                 .slots
                 .iter_mut()
-                .filter(|slot| slot.should_archive(entry_to_archive_to))
+                .filter(|slot| slot.should_checkpoint(entry_to_checkpoint_to))
             {
                 let writer = slot.writer.as_mut().unwrap();
                 // TODO error handling?
@@ -377,36 +423,53 @@ impl WriteAheadLog {
 struct Data {
     next_entry_id: AtomicU64,
     directory: PathBuf,
-    archiver: Mutex<Box<dyn Archiver>>,
+    checkpointer: Mutex<Box<dyn Checkpointer>>,
     segments: Mutex<SegmentFiles>,
     segments_sync: Condvar,
     dirsync_sync: Condvar,
-    archive_sync: Condvar,
-    archive_to_sender: Watchable<EntryId>,
-    config: Config,
+    checkpoint_sync: Condvar,
+    checkpoint_to_sender: Watchable<EntryId>,
+    config: Configuration,
 }
 
+/// Controls a [`WriteAheadLog`]'s behavior.
 #[derive(Debug)]
-pub struct Config {
+pub struct Configuration {
+    /// This information is written to the start of each log segment, and is
+    /// available for reading during [`Checkpointer::should_recover`]. This
+    /// field is intended to be used to identify the format of the data stored
+    /// within the log, allowing for the format to change over time without
+    /// breaking the abilty to recover existing log files during an upgrade.
     pub version_info: Vec<u8>,
+    /// The maximum number of segments that can have a [`EntryWriter`] at any
+    /// given time.
     pub active_segment_limit: usize,
-    pub archive_after_bytes: u64,
-    pub file_manager: AnyFileManager,
+    /// The number of bytes that need to be written before checkpointing will
+    /// automatically occur. The actual amount of data checkpointed may be
+    /// significantly higher than this, depending on all in-progress writes at
+    /// the time the threshold is surpassed.
+    ///
+    /// Only one checkpoint operation can happen at any given time. This means
+    /// that if data is written faster to the log than it can be checkpointed,
+    /// the WAL may grow significantly larger than this threshold.
+    pub checkpoint_after_bytes: u64,
+    /// The file manager to use for all file operations.
+    pub file_manager: FileManager,
 }
 
-impl Default for Config {
+impl Default for Configuration {
     fn default() -> Self {
         Self {
             version_info: Vec::default(),
             active_segment_limit: 8,
-            archive_after_bytes: 8 * 1024 * 1024,
-            file_manager: AnyFileManager::Std,
+            checkpoint_after_bytes: 8 * 1024 * 1024,
+            file_manager: FileManager::Std,
         }
     }
 }
 
-impl Config {
-    pub fn validate(&self) -> io::Result<()> {
+impl Configuration {
+    fn validate(&self) -> io::Result<()> {
         if self.version_info.len() > 255 {
             return Err(io::Error::new(
                 ErrorKind::Other,
@@ -417,7 +480,7 @@ impl Config {
         Ok(())
     }
 
-    fn write_segment_header(&self, file: &mut AnyFile) -> io::Result<()> {
+    fn write_segment_header(&self, file: &mut File) -> io::Result<()> {
         let mut buf = BufWriter::new(file);
         buf.write_all(b"okw\0")?;
         let version_size = u8::try_from(self.version_info.len()).to_io()?;
@@ -429,27 +492,58 @@ impl Config {
     }
 }
 
-pub trait Archiver: Send + Sync + Debug {
+/// Customizes recovery and checkpointing behavior for a [`WriteAheadLog`].
+pub trait Checkpointer: Send + Sync + Debug {
+    /// When recovering a [`WriteAheadLog`], this function is called for each
+    /// segment as it is read. To allow the segment to have its data recovered,
+    /// return [`Recovery::Recover`]. If you wish to abandon the data contained
+    /// in the segment, return [`Recovery::Abandon`].
     fn should_recover_segment(&mut self, segment: &RecoveredSegment) -> io::Result<Recovery>;
+    /// Invoked once for each entry contained in all recovered segments within a
+    /// [`WriteAheadLog`].
+    ///
+    /// [`Entry::read_chunk()`] can be used to read each chunk of data that was
+    /// written via [`EntryWriter::write_chunk`]. The order of chunks is guaranteed
+    /// to be the same as the order they were written in.
     fn recover(&mut self, entry: &mut Entry<'_>) -> io::Result<()>;
 
-    fn archive(&mut self, last_archived_id: EntryId) -> io::Result<()>;
+    /// Invoked each time the [`WriteAheadLog`] is ready to recycle and reuse
+    /// segment files.
+    fn checkpoint_to(&mut self, last_checkpointed_id: EntryId) -> io::Result<()>;
 }
 
+/// Information about an individual segment of a [`WriteAheadLog`] that is being
+/// recovered.
 pub struct RecoveredSegment {
+    /// The value of [`Configuration::version_info`] at the time this segment
+    /// was created.
     pub version_info: Vec<u8>,
 }
 
+/// The unique id of an entry written to a [`WriteAheadLog`]. These IDs are
+/// ordered by the time the [`EntryWriter`] was created for the entry written with this id.
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Copy, Clone, Default)]
 pub struct EntryId(pub u64);
 
+/// A stored entry inside of a [`WriteAheadLog`].
+///
+/// Each entry is composed of a series of chunks of data that were previously
+/// written using [`EntryWriter::write_chunk`].
 pub struct Entry<'a> {
-    pub id: EntryId,
+    id: EntryId,
     reader: &'a mut SegmentReader,
 }
 
 impl<'entry> Entry<'entry> {
-    pub fn read_chunk<'chunk>(&'chunk mut self) -> io::Result<Option<EntryData<'chunk, 'entry>>> {
+    /// The unique id of this entry.
+    #[must_use]
+    pub const fn id(&self) -> EntryId {
+        self.id
+    }
+
+    /// Reads the next chunk of data written in this entry, or `None` if no more
+    /// chunks are found.
+    pub fn read_chunk<'chunk>(&'chunk mut self) -> io::Result<Option<EntryChunk<'chunk, 'entry>>> {
         if self.reader.file.buffer().len() < 9 {
             self.reader.file.fill_buf()?;
         }
@@ -457,7 +551,7 @@ impl<'entry> Entry<'entry> {
         if self.reader.file.buffer().len() > 9 && self.reader.file.buffer()[0] == CHUNK {
             let mut header_bytes = [0; 9];
             self.reader.file.read_exact(&mut header_bytes)?;
-            return Ok(Some(EntryData {
+            return Ok(Some(EntryChunk {
                 entry: self,
                 calculated_crc: 0,
                 stored_crc: u32::from_le_bytes(
@@ -473,14 +567,25 @@ impl<'entry> Entry<'entry> {
     }
 }
 
-pub struct EntryData<'chunk, 'entry> {
+/// A chunk of data previously written using [`EntryWriter::write_chunk`].
+pub struct EntryChunk<'chunk, 'entry> {
     entry: &'chunk mut Entry<'entry>,
     bytes_remaining: u32,
     stored_crc: u32,
     calculated_crc: u32,
 }
 
-impl<'chunk, 'entry> EntryData<'chunk, 'entry> {
+impl<'chunk, 'entry> EntryChunk<'chunk, 'entry> {
+    /// Returns the number of bytes remaining to read from this chunk.
+    #[must_use]
+    pub const fn bytes_remaining(&self) -> u32 {
+        self.bytes_remaining
+    }
+
+    /// Returns true if the CRC has been validated, or false if the computed crc
+    /// is different than the stored crc. Returns `None` if not all data has
+    /// been read yet.
+    #[must_use]
     pub const fn check_crc(&self) -> Option<bool> {
         if self.bytes_remaining > 0 {
             None
@@ -489,6 +594,7 @@ impl<'chunk, 'entry> EntryData<'chunk, 'entry> {
         }
     }
 
+    /// Reads all of the remaining data from this chunk.
     pub fn read_all(&mut self) -> io::Result<Vec<u8>> {
         let mut data = Vec::with_capacity(usize::try_from(self.bytes_remaining).to_io()?);
         self.read_to_end(&mut data)?;
@@ -496,7 +602,7 @@ impl<'chunk, 'entry> EntryData<'chunk, 'entry> {
     }
 }
 
-impl<'chunk, 'entry> Read for EntryData<'chunk, 'entry> {
+impl<'chunk, 'entry> Read for EntryChunk<'chunk, 'entry> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         let bytes_remaining = usize::try_from(self.bytes_remaining).to_io()?;
         let bytes_to_read = bytes_remaining.min(buf.len());
@@ -512,8 +618,13 @@ impl<'chunk, 'entry> Read for EntryData<'chunk, 'entry> {
     }
 }
 
+/// Determines whether to recover a segment or not.
 pub enum Recovery {
+    /// Recover the segment.
     Recover,
+    /// Abandon the segment and any entries stored within it. **Warning: This
+    /// means losing data that was previously written to the log. This should
+    /// rarely, if ever, be done.**
     Abandon,
 }
 
@@ -524,17 +635,17 @@ struct SegmentFiles {
     slots: Vec<FileSlot>,
     active_slots: VecDeque<u16>,
     active_slot_count: usize,
-    unarchived_bytes: u64,
+    uncheckpointed_bytes: u64,
 }
 
 impl SegmentFiles {
-    fn remove_segments_for_archiving(&mut self, archive_to: EntryId) {
+    fn remove_segments_for_archiving(&mut self, checkpoint_to: EntryId) {
         let mut active_slot_index = 0;
         while active_slot_index < self.active_slots.len() {
             let slot = &mut self.slots[usize::from(self.active_slots[active_slot_index])];
-            if slot.first_entry_id.is_some() && slot.first_entry_id.unwrap() <= archive_to {
+            if slot.first_entry_id.is_some() && slot.first_entry_id.unwrap() <= checkpoint_to {
                 slot.active = false;
-                // This segment contains data that needs to be archived.
+                // This segment contains data that needs to be checkpointed.
                 self.active_slots.remove(active_slot_index);
                 self.active_slot_count -= 1;
             } else {
@@ -554,19 +665,21 @@ struct FileSlot {
 }
 
 impl FileSlot {
-    fn should_archive(&self, archive_to: EntryId) -> bool {
-        self.first_entry_id.is_some() && self.first_entry_id.unwrap() <= archive_to
+    fn should_checkpoint(&self, checkpoint_to: EntryId) -> bool {
+        self.first_entry_id.is_some() && self.first_entry_id.unwrap() <= checkpoint_to
     }
 
-    fn can_archive_if_needed(&self, archive_to: EntryId) -> bool {
-        let should_archive = self.should_archive(archive_to);
-        !should_archive || self.writer.is_some()
+    fn can_checkpoint_if_needed(&self, checkpoint_to: EntryId) -> bool {
+        let should_checkpoint = self.should_checkpoint(checkpoint_to);
+        !should_checkpoint || self.writer.is_some()
     }
 }
 
-pub struct CompleteSegments {}
-
-pub struct LogWriter {
+/// Writes an entry to a [`WriteAheadLog`].
+///
+/// Each entry has a unique id and one or more chunks of data.
+pub struct EntryWriter {
+    /// The unique id of the entry being written.
     pub entry_id: EntryId,
     log: WriteAheadLog,
     slot_id: u16,
@@ -578,7 +691,7 @@ pub struct LogWriter {
 const NEW_ENTRY: u8 = 1;
 const CHUNK: u8 = 2;
 
-impl LogWriter {
+impl EntryWriter {
     fn new(log: WriteAheadLog, slot_id: u16, file: LockedFile) -> io::Result<Self> {
         let entry_id = EntryId(log.data.next_entry_id.fetch_add(1, Ordering::SeqCst));
         let original_file_length = file.len()?;
@@ -597,6 +710,8 @@ impl LogWriter {
         })
     }
 
+    /// Commits this entry to the log. Once this call returns, all data is
+    /// atomically updated and synchronized to disk.
     pub fn commit(mut self) -> io::Result<EntryId> {
         let mut file = self.file.take().expect("already committed").into_inner()?;
         file.sync_data()?;
@@ -611,7 +726,9 @@ impl LogWriter {
         Ok(self.entry_id)
     }
 
-    pub fn write_all(&mut self, data: &[u8]) -> io::Result<DataRecord> {
+    /// Appends a chunk of data to this log entry. Each chunk of data is able to
+    /// be read using [`Entry::read_chunk`].
+    pub fn write_chunk(&mut self, data: &[u8]) -> io::Result<ChunkRecord> {
         let length = u32::try_from(data.len()).to_io()?;
         let position = self.position()?;
         let file = self.file.as_mut().expect("already dropped");
@@ -637,14 +754,14 @@ impl LogWriter {
 
         self.bytes_written += 9 + u64::from(length);
 
-        Ok(DataRecord {
+        Ok(ChunkRecord {
             position,
             crc,
             length,
         })
     }
 
-    pub fn position(&self) -> io::Result<LogPosition> {
+    fn position(&self) -> io::Result<LogPosition> {
         let file = self.file.as_ref().expect("already dropped");
         let offset = file.get_ref().position();
         let pending_bytes = u64::try_from(file.buffer().len()).to_io()?;
@@ -654,6 +771,9 @@ impl LogWriter {
         })
     }
 
+    /// Abandons this entry, preventing the entry from being recovered in the
+    /// future. This is automatically done when dropped, but errors that occur
+    /// during drop will panic.
     pub fn abandon(mut self) -> io::Result<()> {
         self.rollback_session()
     }
@@ -673,24 +793,29 @@ impl LogWriter {
     }
 }
 
-impl Drop for LogWriter {
+impl Drop for EntryWriter {
     fn drop(&mut self) {
         if self.file.is_some() {
-            self.rollback_session().unwrap()
+            self.rollback_session().unwrap();
         }
     }
 }
 
+/// The position of a chunk of data within a [`WriteAheadLog`].
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub struct LogPosition {
     slot_id: u16,
     offset: u64,
 }
 
+/// A record of a chunk that was written to a [`WriteAheadLog`].
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub struct DataRecord {
+pub struct ChunkRecord {
+    /// The position of the chunk.
     pub position: LogPosition,
+    /// The crc calculated for the chunk.
     pub crc: u32,
+    /// The length of the data contained inside of the chunk.
     pub length: u32,
 }
 
@@ -709,7 +834,7 @@ impl<T> ToIoResult<T> for Result<T, TryFromIntError> {
 
 struct SegmentReader {
     slot_index: usize,
-    file: BufReader<AnyFile>,
+    file: BufReader<File>,
     header: RecoveredSegment,
     current_entry_id: Option<EntryId>,
     first_entry_id: Option<EntryId>,
@@ -718,7 +843,7 @@ struct SegmentReader {
 }
 
 impl SegmentReader {
-    pub fn new(slot_id: usize, file: AnyFile) -> io::Result<Self> {
+    pub fn new(slot_id: usize, file: File) -> io::Result<Self> {
         let mut file = BufReader::new(file);
         let mut buffer = Vec::with_capacity(256 + 5);
         buffer.resize(5, 0);
@@ -746,7 +871,7 @@ impl SegmentReader {
             version_info: buffer,
         };
 
-        let mut reader = Self {
+        let mut segment_reader = Self {
             slot_index: slot_id,
             file,
             header,
@@ -756,9 +881,9 @@ impl SegmentReader {
             valid_until: u64::from(version_info_length) + 5,
         };
 
-        reader.read_next_entry()?;
+        segment_reader.read_next_entry()?;
 
-        Ok(reader)
+        Ok(segment_reader)
     }
 
     pub fn current_entry_id(&mut self) -> Option<EntryId> {
@@ -800,10 +925,11 @@ impl SegmentReader {
 #[cfg(test)]
 mod tests;
 
+/// A [`Checkpointer`] that does not attempt to recover any existing data.
 #[derive(Debug)]
-pub struct VoidArchiver;
+pub struct VoidCheckpointer;
 
-impl Archiver for VoidArchiver {
+impl Checkpointer for VoidCheckpointer {
     fn should_recover_segment(&mut self, _segment: &RecoveredSegment) -> io::Result<Recovery> {
         Ok(Recovery::Abandon)
     }
@@ -812,7 +938,7 @@ impl Archiver for VoidArchiver {
         Ok(())
     }
 
-    fn archive(&mut self, _last_archived_id: EntryId) -> io::Result<()> {
+    fn checkpoint_to(&mut self, _last_checkpointed_id: EntryId) -> io::Result<()> {
         Ok(())
     }
 }

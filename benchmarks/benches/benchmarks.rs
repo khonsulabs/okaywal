@@ -1,6 +1,6 @@
 use std::{convert::Infallible, fmt::Display, sync::Arc};
 
-use okaywal::{Config, VoidArchiver, WriteAheadLog};
+use okaywal::{Configuration, VoidCheckpointer, WriteAheadLog};
 use tempfile::TempDir;
 use timings::{Benchmark, BenchmarkImplementation, Label, Timings};
 
@@ -61,10 +61,10 @@ impl BenchmarkImplementation<Label, InsertConfig, Infallible> for OkayWal {
         let dir = Arc::new(TempDir::new_in(".").unwrap());
         let log = WriteAheadLog::recover_with_config(
             dir.as_ref(),
-            VoidArchiver,
-            Config {
+            VoidCheckpointer,
+            Configuration {
                 active_segment_limit: number_of_threads,
-                ..Config::default()
+                ..Configuration::default()
             },
         )
         .unwrap();
@@ -94,7 +94,7 @@ impl BenchmarkImplementation<Label, InsertConfig, Infallible> for OkayWal {
         for _ in 0..self.config.iters {
             let measurement = measurements.begin(label.clone(), metric.clone());
             let mut session = self.log.write().unwrap();
-            session.write_all(&data).unwrap();
+            session.write_chunk(&data).unwrap();
             session.commit().unwrap();
             measurement.finish();
         }
