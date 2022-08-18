@@ -1,0 +1,8 @@
+[package]
+name = "xtask"
+version = "0.0.0"
+edition = "2018"
+publish = false
+
+[dependencies]
+khonsu-tools = { git = "https://github.com/khonsulabs/khonsu-tools.git", branch = "main" }

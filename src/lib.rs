@@ -254,9 +254,10 @@ impl WriteAheadLog {
             segments.slots[slot_index].latest_entry_id = Some(entry_id);
 
             segments.uncheckpointed_bytes += bytes_written;
-            if segments.uncheckpointed_bytes >= self.data.config.checkpoint_after_bytes {
+            if segments.uncheckpointed_bytes >= self.data.config.checkpoint_after_bytes
+                && self.data.checkpoint_to_sender.update(entry_id).is_ok()
+            {
                 segments.uncheckpointed_bytes = 0;
-                self.data.checkpoint_to_sender.replace(entry_id);
                 segments.remove_segments_for_archiving(entry_id);
             }
         }

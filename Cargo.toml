@@ -21,4 +21,4 @@ tempfile = "3.3.0"
 fastrand = "1.8.0"
 
 [workspace]
-members = ["benchmarks"]
+members = ["benchmarks", "xtask"]
