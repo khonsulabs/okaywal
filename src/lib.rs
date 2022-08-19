@@ -137,6 +137,10 @@ impl WriteAheadLog {
         Ok(wal)
     }
 
+    /// Shuts the log down. This prevents new writes or checkpoints from
+    /// starting, but does not prevent reading data or finishing currently
+    /// outstanding writes. This function will block until all outstanding
+    /// writes have completed and any checkpointing operation is finished.
     pub fn shutdown(&self) -> io::Result<()> {
         let mut segments = self.data.segments.lock();
         segments.shutdown = true;
@@ -1106,12 +1110,16 @@ impl Checkpointer for VoidCheckpointer {
     }
 }
 
+/// An error from a [`WriteAheadLog`].
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+    /// The write-ahead log is shutting down.
     #[error("wal shutting down")]
     ShuttingDown,
+    /// An unexpected IO error occurred.
     #[error("io error: {0}")]
     Io(#[from] io::Error),
 }
 
+/// A result from `okwal`.
 pub type Result<T> = std::result::Result<T, Error>;
