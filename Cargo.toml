@@ -15,6 +15,7 @@ parking_lot = "0.12.1"
 crc32c = "0.6.3"
 watchable = "0.1.0"
 fs2 = "0.4.3"
+thiserror = "1.0.32"
 
 [dev-dependencies]
 tempfile = "3.3.0"

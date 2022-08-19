@@ -8,7 +8,7 @@ use std::{
 use parking_lot::Mutex;
 use tempfile::tempdir;
 
-use crate::{Checkpointer, Entry, EntryId, Recovery, WriteAheadLog, NEW_ENTRY};
+use crate::{Checkpointer, Entry, EntryId, Error, Recovery, WriteAheadLog, NEW_ENTRY};
 
 #[derive(Default, Debug, Clone)]
 struct LoggingCheckpointer {
@@ -156,7 +156,7 @@ fn multithreaded() {
         let written_entries = original_entries.clone();
         threads.push(std::thread::spawn(move || {
             let rng = fastrand::Rng::new();
-            for _ in 1..250 {
+            for _ in 1..100 {
                 let mut messages = Vec::with_capacity(rng.usize(1..=8));
                 let mut writer = wal.write().unwrap();
                 for _ in 0..messages.capacity() {
@@ -172,14 +172,14 @@ fn multithreaded() {
             }
         }));
     }
-    drop(wal);
 
     for thread in threads {
         thread.join().unwrap();
     }
 
-    println!("Reopening log");
+    drop(wal);
 
+    println!("Reopening log");
     let checkpointer = VerifyingCheckpointer::default();
     let recovered_entries = checkpointer.entries.clone();
     let _wal = WriteAheadLog::recover(&dir, checkpointer).unwrap();
@@ -234,4 +234,61 @@ fn aborted_entry() {
         other => unreachable!("unexpected invocation: {other:?}"),
     }
     drop(invocations);
+}
+
+#[test]
+fn shutdown() {
+    let dir = tempdir().unwrap();
+
+    let mut threads = Vec::new();
+
+    let checkpointer = VerifyingCheckpointer::default();
+    let original_entries = checkpointer.entries.clone();
+    let wal = WriteAheadLog::recover(&dir, checkpointer).unwrap();
+
+    for _ in 0..8 {
+        let wal = wal.clone();
+        let written_entries = original_entries.clone();
+        threads.push(std::thread::spawn(move || -> crate::Result<()> {
+            let rng = fastrand::Rng::new();
+            for _ in 1..100 {
+                let mut messages = Vec::with_capacity(rng.usize(1..=8));
+                let mut writer = wal.write()?;
+                for _ in 0..messages.capacity() {
+                    let message = repeat_with(|| rng.u8(..))
+                        .take(rng.usize(..65_536))
+                        .collect::<Vec<_>>();
+                    writer.write_chunk(&message)?;
+                    messages.push(message);
+                }
+                let entry_id = writer.commit()?;
+                let mut entries = written_entries.lock();
+                entries.insert(entry_id, messages);
+            }
+
+            Ok(())
+        }));
+    }
+
+    wal.shutdown().unwrap();
+
+    for thread in threads {
+        assert!(matches!(thread.join().unwrap(), Err(Error::ShuttingDown)));
+    }
+
+    drop(wal);
+
+    println!("Reopening log");
+    let checkpointer = VerifyingCheckpointer::default();
+    let recovered_entries = checkpointer.entries.clone();
+    let _wal = WriteAheadLog::recover(&dir, checkpointer).unwrap();
+    let recovered_entries = recovered_entries.lock();
+    let original_entries = original_entries.lock();
+    // Check keys first because it's easier to verify a list of ids than it is
+    // to look at debug output of a bunch of bytes.
+    assert_eq!(
+        original_entries.keys().collect::<Vec<_>>(),
+        recovered_entries.keys().collect::<Vec<_>>()
+    );
+    assert_eq!(&*original_entries, &*recovered_entries);
 }

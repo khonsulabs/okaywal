@@ -26,6 +26,7 @@ use std::{
         atomic::{AtomicU64, Ordering},
         Arc, Weak,
     },
+    thread::JoinHandle,
 };
 
 use file::File;
@@ -107,7 +108,7 @@ impl WriteAheadLog {
         segments.segment_sync_index =
             u16::try_from(segments.slots.len().saturating_sub(1)).to_io()?;
 
-        let watchable = Watchable::new(EntryId(0));
+        let watchable = Watchable::new(Some(EntryId(0)));
         let watcher = watchable.watch();
         let wal = Self {
             data: Arc::new(Data {
@@ -120,15 +121,44 @@ impl WriteAheadLog {
                 dirsync_sync: Condvar::new(),
                 checkpoint_sync: Condvar::new(),
                 checkpoint_to_sender: watchable,
+                checkpoint_thread: Mutex::new(None),
             }),
         };
         let thread_wal = Arc::downgrade(&wal.data);
-        std::thread::Builder::new()
-            .name(String::from("okaywal-cp"))
-            .spawn(move || Self::checkpoint_loop(&thread_wal, watcher))
-            .expect("thread spawn failed");
+        let mut checkpoint_thread = wal.data.checkpoint_thread.lock();
+        *checkpoint_thread = Some(
+            std::thread::Builder::new()
+                .name(String::from("okaywal-cp"))
+                .spawn(move || Self::checkpoint_loop(&thread_wal, watcher))
+                .expect("thread spawn failed"),
+        );
+        drop(checkpoint_thread);
 
         Ok(wal)
+    }
+
+    pub fn shutdown(&self) -> io::Result<()> {
+        let mut segments = self.data.segments.lock();
+        segments.shutdown = true;
+        let _ = self.data.checkpoint_to_sender.update(None);
+
+        // Wait for all active writers to return
+        while segments.slots.iter().any(|slot| slot.writer.is_none()) {
+            self.data.segments_sync.wait(&mut segments);
+        }
+        drop(segments);
+
+        // Wait for the checkpointer to complete
+        if let Some(thread) = self.data.checkpoint_thread.lock().take() {
+            match thread.join() {
+                Ok(result) => result?,
+                Err(_) => {
+                    return Err(io::Error::from(ErrorKind::BrokenPipe));
+                }
+            }
+        }
+
+        Ok(())
     }
 
     /// Opens the log for writing. The entry written by the returned
@@ -139,8 +169,9 @@ impl WriteAheadLog {
     ///
     /// Returns various errors that may occur while acquiring a log segment to
     /// write into.
-    pub fn write(&self) -> io::Result<EntryWriter> {
+    pub fn write(&self) -> Result<EntryWriter> {
         let mut segments = self.data.segments.lock();
+        segments.check_shutdown()?;
 
         loop {
             if let Some(slot_id) = segments.active_slots.pop_front() {
@@ -149,7 +180,7 @@ impl WriteAheadLog {
                     .take()
                     .expect("missing file");
 
-                return EntryWriter::new(self.clone(), slot_id, file);
+                return Ok(EntryWriter::new(self.clone(), slot_id, file)?);
             } else if segments.active_slot_count < self.data.config.active_segment_limit {
                 if let Some((slot_id, slot)) = segments
                     .slots
@@ -161,7 +192,11 @@ impl WriteAheadLog {
                     slot.active = true;
                     segments.active_slot_count += 1;
 
-                    return EntryWriter::new(self.clone(), u16::try_from(slot_id).to_io()?, file);
+                    return Ok(EntryWriter::new(
+                        self.clone(),
+                        u16::try_from(slot_id).to_io()?,
+                        file,
+                    )?);
                 }
 
                 // Open a new segment file
@@ -182,7 +217,11 @@ impl WriteAheadLog {
                     active: true,
                 });
 
-                return EntryWriter::new(self.clone(), u16::try_from(slot_id).to_io()?, file);
+                return Ok(EntryWriter::new(
+                    self.clone(),
+                    u16::try_from(slot_id).to_io()?,
+                    file,
+                )?);
             }
 
             self.data.segments_sync.wait(&mut segments);
@@ -255,38 +294,52 @@ impl WriteAheadLog {
 
             segments.uncheckpointed_bytes += bytes_written;
             if segments.uncheckpointed_bytes >= self.data.config.checkpoint_after_bytes
-                && self.data.checkpoint_to_sender.update(entry_id).is_ok()
+                && self
+                    .data
+                    .checkpoint_to_sender
+                    .update(Some(entry_id))
+                    .is_ok()
             {
                 segments.uncheckpointed_bytes = 0;
                 segments.remove_segments_for_archiving(entry_id);
             }
         }
 
+        let mut notify_segment = false;
+        let mut notify_checkpoint = false;
         let checkpoint_to = *self.data.checkpoint_to_sender.write();
-        let segment_made_available = if segments.slots[slot_index].first_entry_id.is_some()
-            && segments.slots[slot_index].first_entry_id.unwrap() <= checkpoint_to
-        {
-            segments.slots[slot_index].active = false;
-            segments.active_slot_count -= 1;
-            let latest_id = segments.slots[slot_index]
-                .latest_entry_id
-                .expect("always present if first_entry_id is");
-            if checkpoint_to < latest_id {
-                self.data.checkpoint_to_sender.replace(latest_id);
+        if let Some(checkpoint_to) = checkpoint_to {
+            if segments.slots[slot_index].first_entry_id.is_some()
+                && segments.slots[slot_index].first_entry_id.unwrap() <= checkpoint_to
+            {
+                notify_checkpoint = true;
+                segments.slots[slot_index].active = false;
+                segments.active_slot_count -= 1;
+                let latest_id = segments.slots[slot_index]
+                    .latest_entry_id
+                    .expect("always present if first_entry_id is");
+                if checkpoint_to < latest_id {
+                    self.data.checkpoint_to_sender.replace(Some(latest_id));
 
-                segments.remove_segments_for_archiving(checkpoint_to);
+                    segments.remove_segments_for_archiving(checkpoint_to);
+                }
+            } else {
+                segments.active_slots.push_back(slot_id);
+                notify_segment = true;
             }
-            false
         } else {
-            segments.active_slots.push_back(slot_id);
-            true
-        };
+            // When shutting down, we notify that the segment's writing file has
+            // been returned, which allows the shutdown caller to proceed.
+            notify_segment = true;
+            notify_checkpoint = true;
+        }
 
         drop(segments);
 
-        if segment_made_available {
+        if notify_segment {
             self.data.segments_sync.notify_one();
-        } else {
+        }
+        if notify_checkpoint {
             self.data.checkpoint_sync.notify_one();
         }
 
@@ -384,8 +437,18 @@ impl WriteAheadLog {
         Ok(EntryId(latest_entry_id))
     }
 
-    fn checkpoint_loop(data: &Weak<Data>, mut checkpoint_to: Watcher<EntryId>) {
-        for mut entry_to_checkpoint_to in &mut checkpoint_to {
+    fn checkpoint_loop(
+        data: &Weak<Data>,
+        mut checkpoint_to: Watcher<Option<EntryId>>,
+    ) -> io::Result<()> {
+        'checkpoint_loop: for entry_to_checkpoint_to in &mut checkpoint_to {
+            let mut entry_to_checkpoint_to =
+                if let Some(entry_to_checkpoint_to) = entry_to_checkpoint_to {
+                    entry_to_checkpoint_to
+                } else {
+                    break;
+                };
+
             let data = if let Some(data) = data.upgrade() {
                 data
             } else {
@@ -394,6 +457,9 @@ impl WriteAheadLog {
             };
 
             let mut segments = data.segments.lock();
+            if segments.shutdown {
+                break;
+            }
             // Wait for all outstanding files that have an EntryId that is <=
             // entry_to_checkpoint_to
             while !segments
@@ -404,12 +470,15 @@ impl WriteAheadLog {
                 data.checkpoint_sync.wait(&mut segments);
                 // Other files may have been returned that need to be
                 // checkpointed but have a later entry id.
-                entry_to_checkpoint_to = *data.checkpoint_to_sender.write();
+                if let Some(latest_entry) = *data.checkpoint_to_sender.write() {
+                    entry_to_checkpoint_to = latest_entry;
+                } else {
+                    break 'checkpoint_loop;
+                }
             }
 
             let mut checkpointer = data.checkpointer.lock();
-            // TODO error handling?
-            checkpointer.checkpoint_to(entry_to_checkpoint_to).unwrap();
+            checkpointer.checkpoint_to(entry_to_checkpoint_to)?;
 
             for slot in segments
                 .slots
@@ -417,14 +486,15 @@ impl WriteAheadLog {
                 .filter(|slot| slot.should_checkpoint(entry_to_checkpoint_to))
             {
                 let writer = slot.writer.as_mut().unwrap();
-                // TODO error handling?
-                writer.set_len(0).unwrap();
-                writer.seek(SeekFrom::Start(0)).unwrap();
-                data.config.write_segment_header(writer).unwrap();
+                writer.set_len(0)?;
+                writer.seek(SeekFrom::Start(0))?;
+                data.config.write_segment_header(writer)?;
                 slot.first_entry_id = None;
                 slot.latest_entry_id = None;
             }
         }
+
+        Ok(())
     }
 }
 
@@ -437,7 +507,8 @@ struct Data {
     segments_sync: Condvar,
     dirsync_sync: Condvar,
     checkpoint_sync: Condvar,
-    checkpoint_to_sender: Watchable<EntryId>,
+    checkpoint_to_sender: Watchable<Option<EntryId>>,
+    checkpoint_thread: Mutex<Option<JoinHandle<io::Result<()>>>>,
     config: Configuration,
 }
 
@@ -701,6 +772,7 @@ pub enum Recovery {
 
 #[derive(Debug, Default)]
 struct SegmentFiles {
+    shutdown: bool,
     directory_is_syncing: bool,
     segment_sync_index: u16,
     slots: Vec<FileSlot>,
@@ -710,6 +782,14 @@ struct SegmentFiles {
 }
 
 impl SegmentFiles {
+    fn check_shutdown(&self) -> Result<()> {
+        if self.shutdown {
+            Err(Error::ShuttingDown)
+        } else {
+            Ok(())
+        }
+    }
+
     fn remove_segments_for_archiving(&mut self, checkpoint_to: EntryId) {
         let mut active_slot_index = 0;
         while active_slot_index < self.active_slots.len() {
@@ -905,7 +985,7 @@ trait ToIoResult<T> {
     fn to_io(self) -> io::Result<T>;
 }
 
-impl<T> ToIoResult<T> for Result<T, TryFromIntError> {
+impl<T> ToIoResult<T> for std::result::Result<T, TryFromIntError> {
     fn to_io(self) -> io::Result<T> {
         match self {
             Ok(result) => Ok(result),
@@ -1025,3 +1105,13 @@ impl Checkpointer for VoidCheckpointer {
         Ok(())
     }
 }
+
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    #[error("wal shutting down")]
+    ShuttingDown,
+    #[error("io error: {0}")]
+    Io(#[from] io::Error),
+}
+
+pub type Result<T> = std::result::Result<T, Error>;

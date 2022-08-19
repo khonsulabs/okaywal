@@ -2,7 +2,7 @@ use std::io::{self, Read};
 
 use okaywal::{Checkpointer, Entry, EntryId, RecoveredSegment, Recovery, WriteAheadLog};
 
-fn main() -> io::Result<()> {
+fn main() -> okaywal::Result<()> {
     // Open a log using an Checkpointer that echoes the information passed into each
     // function that the Checkpointer trait defines.
     let log = WriteAheadLog::recover("my-log", LoggingCheckpointer)?;
