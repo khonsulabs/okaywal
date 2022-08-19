@@ -1,9 +1,14 @@
-use std::{collections::BTreeMap, io::Read, iter::repeat_with, sync::Arc};
+use std::{
+    collections::BTreeMap,
+    io::{Read, Write},
+    iter::repeat_with,
+    sync::Arc,
+};
 
 use parking_lot::Mutex;
 use tempfile::tempdir;
 
-use crate::{Checkpointer, Entry, EntryId, Recovery, WriteAheadLog};
+use crate::{Checkpointer, Entry, EntryId, Recovery, WriteAheadLog, NEW_ENTRY};
 
 #[derive(Default, Debug, Clone)]
 struct LoggingCheckpointer {
@@ -40,17 +45,13 @@ impl Checkpointer for LoggingCheckpointer {
     fn recover(&mut self, entry: &mut Entry<'_>) -> std::io::Result<()> {
         let entry_id = entry.id;
 
-        let mut invocations = self.invocations.lock();
-        let mut chunks = Vec::new();
-        while let Some(mut chunk) = entry.read_chunk()? {
-            let data = chunk.read_all()?;
-            assert!(chunk.check_crc().expect("data should be finished"));
-            chunks.push(data);
+        if let Some(chunks) = entry.read_all_chunks()? {
+            let mut invocations = self.invocations.lock();
+            invocations.push(CheckpointCall::Recover {
+                entry_id,
+                data: chunks,
+            });
         }
-        invocations.push(CheckpointCall::Recover {
-            entry_id,
-            data: chunks,
-        });
 
         Ok(())
     }
@@ -124,13 +125,10 @@ impl Checkpointer for VerifyingCheckpointer {
     }
 
     fn recover(&mut self, entry: &mut Entry<'_>) -> std::io::Result<()> {
-        let mut messages = Vec::new();
-        while let Some(mut chunk) = entry.read_chunk()? {
-            messages.push(chunk.read_all()?);
+        if let Some(chunks) = entry.read_all_chunks()? {
+            let mut entries = self.entries.lock();
+            entries.insert(entry.id, chunks);
         }
-
-        let mut entries = self.entries.lock();
-        entries.insert(entry.id, messages);
 
         Ok(())
     }
@@ -194,4 +192,46 @@ fn multithreaded() {
         recovered_entries.keys().collect::<Vec<_>>()
     );
     assert_eq!(&*original_entries, &*recovered_entries);
+}
+
+#[test]
+fn aborted_entry() {
+    let dir = tempdir().unwrap();
+
+    let checkpointer = LoggingCheckpointer::default();
+
+    let message = b"hello world";
+
+    let wal = WriteAheadLog::recover(&dir, checkpointer.clone()).unwrap();
+    let mut writer = wal.write().unwrap();
+    let record = writer.write_chunk(message).unwrap();
+    let written_entry_id = writer
+        .commit_and(|file| file.write_all(&[NEW_ENTRY]))
+        .unwrap();
+    println!("hello world written to {record:?} in {written_entry_id:?}");
+    drop(wal);
+
+    let invocations = checkpointer.invocations.lock();
+    assert!(invocations.is_empty());
+    drop(invocations);
+
+    WriteAheadLog::recover(&dir, checkpointer.clone()).unwrap();
+
+    let invocations = checkpointer.invocations.lock();
+    assert_eq!(invocations.len(), 2);
+    match &invocations[0] {
+        CheckpointCall::ShouldRecoverSegment { version_info } => {
+            assert!(version_info.is_empty());
+        }
+        other => unreachable!("unexpected invocation: {other:?}"),
+    }
+    match &invocations[1] {
+        CheckpointCall::Recover { entry_id, data } => {
+            assert_eq!(written_entry_id, *entry_id);
+            assert_eq!(data.len(), 1);
+            assert_eq!(data[0], message);
+        }
+        other => unreachable!("unexpected invocation: {other:?}"),
+    }
+    drop(invocations);
 }

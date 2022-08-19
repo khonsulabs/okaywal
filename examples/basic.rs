@@ -58,17 +58,20 @@ impl Checkpointer for LoggingCheckpointer {
     }
 
     fn recover(&mut self, entry: &mut Entry<'_>) -> io::Result<()> {
-        let mut all_data = Vec::new();
-        while let Some(mut chunk) = entry.read_chunk()? {
-            let data = chunk.read_all()?;
-            all_data.push(String::from_utf8(data).expect("invalid utf-8"));
+        if let Some(all_chunks) = entry.read_all_chunks()? {
+            let all_chunks = all_chunks
+                .into_iter()
+                .map(String::from_utf8)
+                .collect::<Result<Vec<String>, _>>()
+                .expect("invalid utf-8");
+            println!(
+                "LoggingCheckpointer::recover(entry_id: {:?}, data: {:?})",
+                entry.id(),
+                all_chunks,
+            );
+        } else {
+            // This entry wasn't completely written.
         }
-
-        println!(
-            "LoggingCheckpointer::recover(entry_id: {:?}, data: {:?})",
-            entry.id(),
-            all_data,
-        );
 
         Ok(())
     }

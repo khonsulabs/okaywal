@@ -337,11 +337,19 @@ impl WriteAheadLog {
             if let Some(lowest_entry_reader) = lowest_entry_reader {
                 let reader = &mut readers[lowest_entry_reader];
 
-                checkpointer.recover(&mut Entry {
+                latest_entry_id = reader.current_entry_id.unwrap().0;
+                let mut entry = Entry {
                     id: reader.current_entry_id.unwrap(),
                     reader,
-                })?;
-                latest_entry_id = reader.current_entry_id.unwrap().0;
+                };
+                checkpointer.recover(&mut entry)?;
+                while let Some(mut chunk) = match entry.read_chunk()? {
+                    ReadChunkResult::Chunk(chunk) => Some(chunk),
+                    _ => None,
+                } {
+                    // skip chunk
+                    chunk.skip_remaining_bytes()?;
+                }
 
                 if !reader.read_next_entry()? {
                     // No more entries.
@@ -515,6 +523,7 @@ pub trait Checkpointer: Send + Sync + Debug {
 
 /// Information about an individual segment of a [`WriteAheadLog`] that is being
 /// recovered.
+#[derive(Debug)]
 pub struct RecoveredSegment {
     /// The value of [`Configuration::version_info`] at the time this segment
     /// was created.
@@ -530,6 +539,7 @@ pub struct EntryId(pub u64);
 ///
 /// Each entry is composed of a series of chunks of data that were previously
 /// written using [`EntryWriter::write_chunk`].
+#[derive(Debug)]
 pub struct Entry<'a> {
     id: EntryId,
     reader: &'a mut SegmentReader,
@@ -542,9 +552,24 @@ impl<'entry> Entry<'entry> {
         self.id
     }
 
-    /// Reads the next chunk of data written in this entry, or `None` if no more
-    /// chunks are found.
-    pub fn read_chunk<'chunk>(&'chunk mut self) -> io::Result<Option<EntryChunk<'chunk, 'entry>>> {
+    /// Reads the next chunk of data written in this entry. If another chunk of
+    /// data is found in this entry, [`ReadChunkResult::Chunk`] will be
+    /// returned. If no other chunks are found, [`ReadChunkResult::EndOfEntry`]
+    /// will be returned.
+    ///
+    /// # Aborted Log Entries
+    ///
+    /// In the event of recovering from a crash or power outage, it is possible
+    /// to receive [`ReadChunkResult::AbortedEntry`]. It is also possible when
+    /// reading from a returned [`EntryChunk`] to encounter an unexpected
+    /// end-of-file error. When these situations arise, the entire entry that
+    /// was being read should be ignored.
+    ///
+    /// The format chosen for this log format makes some tradeoffs, and one of
+    /// the tradeoffs is not knowing the full length of an entry when it is
+    /// being written. This allows for very large log entries to be written
+    /// without requiring memory for the entire entry.
+    pub fn read_chunk<'chunk>(&'chunk mut self) -> io::Result<ReadChunkResult<'chunk, 'entry>> {
         if self.reader.file.buffer().len() < 9 {
             self.reader.file.fill_buf()?;
         }
@@ -552,7 +577,7 @@ impl<'entry> Entry<'entry> {
         if self.reader.file.buffer().len() > 9 && self.reader.file.buffer()[0] == CHUNK {
             let mut header_bytes = [0; 9];
             self.reader.file.read_exact(&mut header_bytes)?;
-            return Ok(Some(EntryChunk {
+            Ok(ReadChunkResult::Chunk(EntryChunk {
                 entry: self,
                 calculated_crc: 0,
                 stored_crc: u32::from_le_bytes(
@@ -561,14 +586,48 @@ impl<'entry> Entry<'entry> {
                 bytes_remaining: u32::from_le_bytes(
                     header_bytes[5..].try_into().expect("u32 is 4 bytes"),
                 ),
-            }));
+            }))
+        } else if self.reader.file.buffer().first().copied() == Some(END_OF_ENTRY) {
+            self.reader.file.consume(1);
+            Ok(ReadChunkResult::EndOfEntry)
+        } else {
+            Ok(ReadChunkResult::AbortedEntry)
         }
+    }
 
-        Ok(None)
+    /// Reads all chunks for this entry. If the entry was completely written,
+    /// the list of chunks of data is returned. If the entry wasn't completely
+    /// written, None will be returned.
+    pub fn read_all_chunks(&mut self) -> io::Result<Option<Vec<Vec<u8>>>> {
+        let mut chunks = Vec::new();
+        loop {
+            let mut chunk = match self.read_chunk()? {
+                ReadChunkResult::Chunk(chunk) => chunk,
+                ReadChunkResult::EndOfEntry => break,
+                ReadChunkResult::AbortedEntry => return Ok(None),
+            };
+            chunks.push(chunk.read_all()?);
+        }
+        Ok(Some(chunks))
     }
 }
 
+/// The result of reading a chunk from a log segment.
+#[derive(Debug)]
+pub enum ReadChunkResult<'chunk, 'entry> {
+    /// A chunk was found.
+    Chunk(EntryChunk<'chunk, 'entry>),
+    /// The end of the entry has been reached.
+    EndOfEntry,
+    /// An aborted entry was detected. This should only be encountered if log
+    /// entries were being written when the computer or application crashed.
+    ///
+    /// When is returned, the entire entry should be ignored.
+    AbortedEntry,
+}
+
 /// A chunk of data previously written using [`EntryWriter::write_chunk`].
+#[derive(Debug)]
 pub struct EntryChunk<'chunk, 'entry> {
     entry: &'chunk mut Entry<'entry>,
     bytes_remaining: u32,
@@ -600,6 +659,17 @@ impl<'chunk, 'entry> EntryChunk<'chunk, 'entry> {
         let mut data = Vec::with_capacity(usize::try_from(self.bytes_remaining).to_io()?);
         self.read_to_end(&mut data)?;
         Ok(data)
+    }
+
+    fn skip_remaining_bytes(&mut self) -> io::Result<()> {
+        if self.bytes_remaining > 0 {
+            self.entry
+                .reader
+                .file
+                .seek(SeekFrom::Current(i64::from(self.bytes_remaining)))?;
+            self.bytes_remaining = 0;
+        }
+        Ok(())
     }
 }
 
@@ -691,6 +761,7 @@ pub struct EntryWriter {
 
 const NEW_ENTRY: u8 = 1;
 const CHUNK: u8 = 2;
+const END_OF_ENTRY: u8 = 3;
 
 impl EntryWriter {
     fn new(log: WriteAheadLog, slot_id: u16, file: LockedFile) -> io::Result<Self> {
@@ -713,8 +784,18 @@ impl EntryWriter {
 
     /// Commits this entry to the log. Once this call returns, all data is
     /// atomically updated and synchronized to disk.
-    pub fn commit(mut self) -> io::Result<EntryId> {
-        let mut file = self.file.take().expect("already committed").into_inner()?;
+    pub fn commit(self) -> io::Result<EntryId> {
+        self.commit_and(|_file| Ok(()))
+    }
+
+    fn commit_and<F: FnOnce(&mut BufWriter<LockedFile>) -> io::Result<()>>(
+        mut self,
+        callback: F,
+    ) -> io::Result<EntryId> {
+        let mut file = self.file.take().expect("already committed");
+        file.write_all(&[END_OF_ENTRY])?;
+        callback(&mut file)?;
+        let mut file = file.into_inner()?;
         file.sync_data()?;
 
         self.log.reclaim(
@@ -833,6 +914,7 @@ impl<T> ToIoResult<T> for Result<T, TryFromIntError> {
     }
 }
 
+#[derive(Debug)]
 struct SegmentReader {
     slot_index: usize,
     file: BufReader<File>,
