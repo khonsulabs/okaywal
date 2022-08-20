@@ -6,6 +6,7 @@ use okaywal::{
 };
 
 fn main() -> okaywal::Result<()> {
+    // begin rustme snippet: readme-example
     // Open a log using an Checkpointer that echoes the information passed into each
     // function that the Checkpointer trait defines.
     let log = WriteAheadLog::recover("my-log", LoggingCheckpointer)?;
@@ -20,6 +21,7 @@ fn main() -> okaywal::Result<()> {
     // To fully flush all written bytes to disk and make the new entry
     // resilliant to a crash, the writer must be committed.
     writer.commit()?;
+    // end rustme snippet
 
     // Let's reopen the log. During this process,
     // LoggingCheckpointer::should_recover_segment will be invoked for each segment

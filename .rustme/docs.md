@@ -1,5 +1,3 @@
-# OkayWAL
-
 A [write-ahead log (WAL)](https://en.wikipedia.org/wiki/Write-ahead_logging)
 implementation for Rust.
 
@@ -27,7 +25,7 @@ This crate exposes a WAL that supports:
 ## Basic How-To
 
 [`WriteAheadLog::recover()`] is used to create or recover a WAL in a given
-directory. To open a log, an implementator of [`Checkpointer`](https://khonsulabs.github.io/okaywal/main/okaywal/trait.Checkpointer.html)
+directory. To open a log, an implementator of [`Checkpointer`]($checkpointer-trait$)
 must be provided. This trait is how OkayWAL communicates with your code when
 recovering or checkpointing a log.
 
@@ -35,20 +33,7 @@ The [basic example][basic-example] shows this process with many comments
 describing how OkayWAL works.
 
 ```rust
-// Open a log using an Checkpointer that echoes the information passed into each
-// function that the Checkpointer trait defines.
-let log = WriteAheadLog::recover("my-log", LoggingCheckpointer)?;
-
-// Begin writing an entry to the log.
-let mut writer = log.write()?;
-
-// Each entry is one or more chunks of data. Each chunk can be individually
-// addressed using its LogPosition.
-let record = writer.write_chunk("this is the first entry".as_bytes())?;
-
-// To fully flush all written bytes to disk and make the new entry
-// resilliant to a crash, the writer must be committed.
-writer.commit()?;
+$../examples/basic.rs:readme-example$
 ```
 
 ## Multi-threaded Ordering of Entries
@@ -70,12 +55,4 @@ of the log entries to help ensure the exact state can be reproduced from the log
 entries despite these inconsistencies.
 
 [wal]: https://en.wikipedia.org/wiki/Write-ahead_logging
-[basic-example]: https://github.com/khonsulabs/okaywal/blob/main/examples/basic.rs
-
-## Open-source Licenses
-
-This project, like all projects from [Khonsu Labs](https://khonsulabs.com/), are
-open-source. This repository is available under the [MIT License](./LICENSE-MIT)
-or the [Apache License 2.0](./LICENSE-APACHE).
-
-To learn more about contributing, please see [CONTRIBUTING.md](./CONTRIBUTING.md).
+[basic-example]: $src-base$/examples/basic.rs

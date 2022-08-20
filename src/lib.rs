@@ -1,4 +1,4 @@
-#![doc = include_str!("../README.md")]
+#![doc = include_str!(".crate-docs.md")]
 #![forbid(unsafe_code)]
 #![warn(
     clippy::cargo,
@@ -43,7 +43,7 @@ pub struct WriteAheadLog {
 
 impl WriteAheadLog {
     /// Creates or recovers a log stored in `directory` using the default
-    /// [`Config`].
+    /// [`Configuration`].
     ///
     /// # Errors
     ///
@@ -304,7 +304,7 @@ impl WriteAheadLog {
                     .is_ok()
             {
                 segments.uncheckpointed_bytes = 0;
-                segments.remove_segments_for_archiving(entry_id);
+                segments.remove_segments_for_checkpointing(entry_id);
             }
         }
 
@@ -324,7 +324,7 @@ impl WriteAheadLog {
                 if checkpoint_to < latest_id {
                     self.data.checkpoint_to_sender.replace(Some(latest_id));
 
-                    segments.remove_segments_for_archiving(checkpoint_to);
+                    segments.remove_segments_for_checkpointing(checkpoint_to);
                 }
             } else {
                 segments.active_slots.push_back(slot_id);
@@ -500,7 +500,7 @@ struct Data {
 #[derive(Debug)]
 pub struct Configuration {
     /// This information is written to the start of each log segment, and is
-    /// available for reading during [`Checkpointer::should_recover`]. This
+    /// available for reading during [`Checkpointer::should_recover_segment`]. This
     /// field is intended to be used to identify the format of the data stored
     /// within the log, allowing for the format to change over time without
     /// breaking the abilty to recover existing log files during an upgrade.
@@ -795,7 +795,7 @@ impl SegmentFiles {
         }
     }
 
-    fn remove_segments_for_archiving(&mut self, checkpoint_to: EntryId) {
+    fn remove_segments_for_checkpointing(&mut self, checkpoint_to: EntryId) {
         let mut active_slot_index = 0;
         while active_slot_index < self.active_slots.len() {
             let slot = &mut self.slots[usize::from(self.active_slots[active_slot_index])];

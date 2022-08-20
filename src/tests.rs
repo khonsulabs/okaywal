@@ -145,7 +145,7 @@ impl Checkpointer for VerifyingCheckpointer {
         last_checkpointed_id: EntryId,
         reader: &mut LogReader<LockedFile>,
     ) -> std::io::Result<()> {
-        println!("Archiving through {last_checkpointed_id:?}");
+        println!("Checkpointed to {last_checkpointed_id:?}");
         let mut entries = self.entries.lock();
         while let Some(mut entry) = reader.read_entry()? {
             let expected_data = entries.remove(&entry.id).expect("unknown entry id");
