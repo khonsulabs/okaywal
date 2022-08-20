@@ -1,9 +1,6 @@
 use std::io::{self, Read};
 
-use okaywal::{
-    Checkpointer, Entry, EntryId, File, LockedFile, LogReader, RecoveredSegment, Recovery,
-    WriteAheadLog,
-};
+use okaywal::{Checkpointer, Entry, EntryId, File, LockedFile, LogReader, WriteAheadLog};
 
 fn main() -> okaywal::Result<()> {
     // begin rustme snippet: readme-example
@@ -53,17 +50,12 @@ fn main() -> okaywal::Result<()> {
 struct LoggingCheckpointer;
 
 impl Checkpointer for LoggingCheckpointer {
-    fn should_recover_segment(&mut self, segment: &RecoveredSegment) -> io::Result<Recovery> {
-        println!(
-            "LoggingCheckpointer::should_recover_segment({:?})",
-            segment.version_info
-        );
-
-        Ok(Recovery::Recover)
-    }
-
     fn recover(&mut self, entry: &mut Entry<'_, File>) -> io::Result<()> {
+        // This example uses read_all_chunks to load the entire entry into
+        // memory for simplicity. The crate also supports reading each chunk
+        // individually to minimize memory usage.
         if let Some(all_chunks) = entry.read_all_chunks()? {
+            // Convert the Vec<u8>'s to Strings.
             let all_chunks = all_chunks
                 .into_iter()
                 .map(String::from_utf8)
@@ -75,7 +67,8 @@ impl Checkpointer for LoggingCheckpointer {
                 all_chunks,
             );
         } else {
-            // This entry wasn't completely written.
+            // This entry wasn't completely written. This could happen if a
+            // power outage or crash occurs while writing an entry.
         }
 
         Ok(())

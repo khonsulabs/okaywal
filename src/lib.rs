@@ -562,7 +562,10 @@ pub trait Checkpointer: Send + Sync + Debug {
     /// segment as it is read. To allow the segment to have its data recovered,
     /// return [`Recovery::Recover`]. If you wish to abandon the data contained
     /// in the segment, return [`Recovery::Abandon`].
-    fn should_recover_segment(&mut self, segment: &RecoveredSegment) -> io::Result<Recovery>;
+    fn should_recover_segment(&mut self, _segment: &RecoveredSegment) -> io::Result<Recovery> {
+        Ok(Recovery::Recover)
+    }
+
     /// Invoked once for each entry contained in all recovered segments within a
     /// [`WriteAheadLog`].
     ///
@@ -573,6 +576,11 @@ pub trait Checkpointer: Send + Sync + Debug {
 
     /// Invoked each time the [`WriteAheadLog`] is ready to recycle and reuse
     /// segment files.
+    ///
+    /// `last_checkpointed_id` is the id of the last entry that is being
+    /// checkedpointed and removed from the log. If needed,
+    /// `checkpointed_entries` can be used to iterate over all entries that are
+    /// being checkpointed.
     fn checkpoint_to(
         &mut self,
         last_checkpointed_id: EntryId,
@@ -612,6 +620,12 @@ where
     #[must_use]
     pub const fn id(&self) -> EntryId {
         self.id
+    }
+
+    /// The segment that this entry was recovered from.
+    #[must_use]
+    pub fn segment(&self) -> &RecoveredSegment {
+        &self.reader.header
     }
 
     /// Reads the next chunk of data written in this entry. If another chunk of

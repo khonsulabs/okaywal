@@ -12,7 +12,7 @@ until this has been incorporated into
 [![crate version](https://img.shields.io/crates/v/okaywal.svg)](https://crates.io/crates/okaywal)
 [![Live Build Status](https://img.shields.io/github/workflow/status/khonsulabs/okaywal/Tests/main)](https://github.com/khonsulabs/okaywal/actions?query=workflow:Tests)
 [![HTML Coverage Report for `main` branch](https://khonsulabs.github.io/okaywal/coverage/badge.svg)](https://khonsulabs.github.io/okaywal/coverage/)
-[![Documentation for `main` branch](https://img.shields.io/badge/docs-main-informational)](https://khonsulabs.github.io/okaywal/main/okaywal/)
+[![Documentation](https://img.shields.io/badge/docs-main-informational)]($docs-base$)
 
 This crate exposes a WAL that supports:
 

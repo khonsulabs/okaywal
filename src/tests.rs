@@ -124,13 +124,6 @@ struct VerifyingCheckpointer {
 }
 
 impl Checkpointer for VerifyingCheckpointer {
-    fn should_recover_segment(
-        &mut self,
-        _segment: &crate::RecoveredSegment,
-    ) -> std::io::Result<Recovery> {
-        Ok(Recovery::Recover)
-    }
-
     fn recover(&mut self, entry: &mut Entry<'_, File>) -> std::io::Result<()> {
         if let Some(chunks) = entry.read_all_chunks()? {
             let mut entries = self.entries.lock();
