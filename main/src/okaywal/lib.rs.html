@@ -1232,7 +1232,7 @@
 <span id="1226">1226</span>
 <span id="1227">1227</span>
 <span id="1228">1228</span>
-</pre><pre class="rust"><code><span class="attribute">#![<span class="ident">doc</span> <span class="op">=</span> <span class="macro">include_str!</span>(<span class="string">&quot;../README.md&quot;</span>)]</span>
+</pre><pre class="rust"><code><span class="attribute">#![<span class="ident">doc</span> <span class="op">=</span> <span class="macro">include_str!</span>(<span class="string">&quot;.crate-docs.md&quot;</span>)]</span>
 <span class="attribute">#![<span class="ident">forbid</span>(<span class="ident">unsafe_code</span>)]</span>
 <span class="attribute">#![<span class="ident">warn</span>(
     <span class="ident">clippy::cargo</span>,
@@ -1277,7 +1277,7 @@
 
 <span class="kw">impl</span> <span class="ident">WriteAheadLog</span> {
     <span class="doccomment">/// Creates or recovers a log stored in `directory` using the default</span>
-    <span class="doccomment">/// [`Config`].</span>
+    <span class="doccomment">/// [`Configuration`].</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// # Errors</span>
     <span class="doccomment">///</span>
@@ -1538,7 +1538,7 @@
                     .<span class="ident">is_ok</span>()
             {
                 <span class="ident">segments</span>.<span class="ident">uncheckpointed_bytes</span> <span class="op">=</span> <span class="number">0</span>;
-                <span class="ident">segments</span>.<span class="ident">remove_segments_for_archiving</span>(<span class="ident">entry_id</span>);
+                <span class="ident">segments</span>.<span class="ident">remove_segments_for_checkpointing</span>(<span class="ident">entry_id</span>);
             }
         }
 
@@ -1558,7 +1558,7 @@
                 <span class="kw">if</span> <span class="ident">checkpoint_to</span> <span class="op">&lt;</span> <span class="ident">latest_id</span> {
                     <span class="self">self</span>.<span class="ident">data</span>.<span class="ident">checkpoint_to_sender</span>.<span class="ident">replace</span>(<span class="prelude-val">Some</span>(<span class="ident">latest_id</span>));
 
-                    <span class="ident">segments</span>.<span class="ident">remove_segments_for_archiving</span>(<span class="ident">checkpoint_to</span>);
+                    <span class="ident">segments</span>.<span class="ident">remove_segments_for_checkpointing</span>(<span class="ident">checkpoint_to</span>);
                 }
             } <span class="kw">else</span> {
                 <span class="ident">segments</span>.<span class="ident">active_slots</span>.<span class="ident">push_back</span>(<span class="ident">slot_id</span>);
@@ -1734,7 +1734,7 @@
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Configuration</span> {
     <span class="doccomment">/// This information is written to the start of each log segment, and is</span>
-    <span class="doccomment">/// available for reading during [`Checkpointer::should_recover`]. This</span>
+    <span class="doccomment">/// available for reading during [`Checkpointer::should_recover_segment`]. This</span>
     <span class="doccomment">/// field is intended to be used to identify the format of the data stored</span>
     <span class="doccomment">/// within the log, allowing for the format to change over time without</span>
     <span class="doccomment">/// breaking the abilty to recover existing log files during an upgrade.</span>
@@ -2029,7 +2029,7 @@
         }
     }
 
-    <span class="kw">fn</span> <span class="ident">remove_segments_for_archiving</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">checkpoint_to</span>: <span class="ident">EntryId</span>) {
+    <span class="kw">fn</span> <span class="ident">remove_segments_for_checkpointing</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">checkpoint_to</span>: <span class="ident">EntryId</span>) {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">active_slot_index</span> <span class="op">=</span> <span class="number">0</span>;
         <span class="kw">while</span> <span class="ident">active_slot_index</span> <span class="op">&lt;</span> <span class="self">self</span>.<span class="ident">active_slots</span>.<span class="ident">len</span>() {
             <span class="kw">let</span> <span class="ident">slot</span> <span class="op">=</span> <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">slots</span>[<span class="ident">usize::from</span>(<span class="self">self</span>.<span class="ident">active_slots</span>[<span class="ident">active_slot_index</span>])];

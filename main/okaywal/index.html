@@ -1,41 +1,68 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Okay WAL"><meta name="keywords" content="rust, rustlang, rust-lang, okaywal"><title>okaywal - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../dark.css" disabled><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../storage.js"></script><script defer src="../crates.js"></script><script defer src="../main.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../favicon.svg"></head><body class="rustdoc mod crate"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../okaywal/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="A write-ahead log (WAL) implementation for Rust."><meta name="keywords" content="rust, rustlang, rust-lang, okaywal"><title>okaywal - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../dark.css" disabled><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../storage.js"></script><script defer src="../crates.js"></script><script defer src="../main.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../favicon.svg"></head><body class="rustdoc mod crate"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../okaywal/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
         </a><h2 class="location"></h2>
     </nav>
     <nav class="sidebar"><a class="sidebar-logo" href="../okaywal/index.html"><div class="logo-container"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></div>
         </a><h2 class="location"><a href="#">Crate okaywal</a></h2><div class="sidebar-elems"><div class="block"><ul><li class="version">Version 0.1.0</li><li><a id="all-types" href="all.html">All Items</a></li></ul></div><section><div class="block"><ul><li><a href="#structs">Structs</a></li><li><a href="#enums">Enums</a></li><li><a href="#traits">Traits</a></li><li><a href="#types">Type Definitions</a></li></ul></div></section></div></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../okaywal/index.html"><img class="rust-logo" src="../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><div id="settings-menu" tabindex="-1">
                                 <a href="../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../wheel.svg"></a></div>
                         </div></form></nav></div><section id="main-content" class="content"><div class="main-heading">
-    <h1 class="fqn"><span class="in-band">Crate <a class="mod" href="#">okaywal</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../src/okaywal/lib.rs.html#1-1228">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><h2 id="okay-wal"><a href="#okay-wal">Okay WAL</a></h2>
-<p>A <a href="https://en.wikipedia.org/wiki/Write-ahead_logging">write-ahead log (WAL)</a>
+    <h1 class="fqn"><span class="in-band">Crate <a class="mod" href="#">okaywal</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span></h1><span class="out-of-band"><a class="srclink" href="../src/okaywal/lib.rs.html#1-1228">source</a> · <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>A <a href="https://en.wikipedia.org/wiki/Write-ahead_logging">write-ahead log (WAL)</a>
 implementation for Rust.</p>
 <blockquote>
 <p>There’s The Great Wall, and then there’s this: an okay WAL.</p>
 </blockquote>
+<p><strong>WARNING: This crate is early in development. Please do not use in any projects
+until this has been incorporated into
+<a href="https://github.com/khonsulabs/sediment">Sediment</a> and shipping as part of
+<a href="https://github.com/khonsulabs/nebari">Nebari</a>.</strong></p>
+<p><img src="https://img.shields.io/badge/unsafe-forbid-success" alt="okaywal forbids unsafe code" />
+<a href="https://crates.io/crates/okaywal"><img src="https://img.shields.io/crates/v/okaywal.svg" alt="crate version" /></a>
+<a href="https://github.com/khonsulabs/okaywal/actions?query=workflow:Tests"><img src="https://img.shields.io/github/workflow/status/khonsulabs/okaywal/Tests/main" alt="Live Build Status" /></a>
+<a href="https://khonsulabs.github.io/okaywal/coverage/"><img src="https://khonsulabs.github.io/okaywal/coverage/badge.svg" alt="HTML Coverage Report for main branch" /></a>
+<a href="https://khonsulabs.github.io/okaywal/main/okaywal/"><img src="https://img.shields.io/badge/docs-main-informational" alt="Documentation for main branch" /></a></p>
 <p>This crate exposes a WAL that supports:</p>
 <ul>
-<li>ACID-compliant writes from multiple threads.</li>
+<li>Atomic and Durable writes from multiple threads.</li>
 <li>Random access for previously written data.</li>
-<li>Supports automatic archiving/checkpointing to allow reusing disk space and
+<li>Automatic checkpointing to allow reusing disk space and
 preventing the WAL from growing too large.</li>
 <li>Interactive recovery process with basic data versioning support.</li>
 </ul>
-<h3 id="multi-threaded-characteristics"><a href="#multi-threaded-characteristics">Multi-threaded characteristics</a></h3>
-<p>This WAL implementation does not attempt to guarantee that recovery of WAL
-entries is performed in the same order in which the writes were written to the
-log. For example, imagine two threads writing to the log simultaneously. Each
-write to the log requires writing the actual data and then calling commit, which
-issues a file synchronization call to ensure all bytes are fully flushed to
-disk.</p>
-<p>What is the order in which the two entries should be recovered in? If the WAL is
-being written to while modifying an in-memory data structure, the actual order
-of the changes is being determined outside of the order of the bytes being
-stored within the WAL. This means that the WAL has no way to properly know the
-exact order of the data.</p>
-<p>During recovery, <code>okaywal</code> will recover entries in the order in which they were
-started. This may require you to either store additional data in the log or
-handle out-of-order operations manually.</p>
-<p>For single-threaded writes, the order is guaranteed to be the order the data is
-written in.</p>
+<h3 id="basic-how-to"><a href="#basic-how-to">Basic How-To</a></h3>
+<p><a href="struct.WriteAheadLog.html#method.recover" title="WriteAheadLog::recover()"><code>WriteAheadLog::recover()</code></a> is used to create or recover a WAL in a given
+directory. To open a log, an implementator of <a href="trait.Checkpointer.html"><code>Checkpointer</code></a>
+must be provided. This trait is how OkayWAL communicates with your code when
+recovering or checkpointing a log.</p>
+<p>The <a href="https://github.com/khonsulabs/okaywal/blob/main/examples/basic.rs">basic example</a> shows this process with many comments
+describing how OkayWAL works.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="comment">// Open a log using an Checkpointer that echoes the information passed into each</span>
+<span class="comment">// function that the Checkpointer trait defines.</span>
+<span class="kw">let</span> <span class="ident">log</span> <span class="op">=</span> <span class="ident">WriteAheadLog::recover</span>(<span class="string">&quot;my-log&quot;</span>, <span class="ident">LoggingCheckpointer</span>)<span class="question-mark">?</span>;
+
+<span class="comment">// Begin writing an entry to the log.</span>
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">writer</span> <span class="op">=</span> <span class="ident">log</span>.<span class="ident">write</span>()<span class="question-mark">?</span>;
+
+<span class="comment">// Each entry is one or more chunks of data. Each chunk can be individually</span>
+<span class="comment">// addressed using its LogPosition.</span>
+<span class="kw">let</span> <span class="ident">record</span> <span class="op">=</span> <span class="ident">writer</span>.<span class="ident">write_chunk</span>(<span class="string">&quot;this is the first entry&quot;</span>.<span class="ident">as_bytes</span>())<span class="question-mark">?</span>;
+
+<span class="comment">// To fully flush all written bytes to disk and make the new entry</span>
+<span class="comment">// resilliant to a crash, the writer must be committed.</span>
+<span class="ident">writer</span>.<span class="ident">commit</span>()<span class="question-mark">?</span>;</code></pre></div>
+<h3 id="multi-threaded-ordering-of-entries"><a href="#multi-threaded-ordering-of-entries">Multi-threaded Ordering of Entries</a></h3>
+<p>This WAL implementation has a simple approach to ordering entries: the order in
+which <code>WriteAheadLog::write</code> is called controls the order in which the entries
+are read. When only one thread is writing to the WAL at any given time, this
+order is expected and predictable.</p>
+<p>However, when multiple threads are writing to the WAL at the same time, there is
+a range of time in which the entry is started, written, and then synchronized to
+disk. If these threads are operating on an in-memory state while also writing to
+the WAL, there is opportunity for information stored in the WAL to be out of
+order relative to the operations being performed in-memory.</p>
+<p>OkayWAL does not provide any facilities for helping sort out these
+inconsistencies. As such, it may be important to store extra information inside
+of the log entries to help ensure the exact state can be reproduced from the log
+entries despite these inconsistencies.</p>
 </div></details><h2 id="structs" class="small-section-header"><a href="#structs">Structs</a></h2>
 <div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.ChunkRecord.html" title="okaywal::ChunkRecord struct">ChunkRecord</a></div><div class="item-right docblock-short"><p>A record of a chunk that was written to a <a href="struct.WriteAheadLog.html" title="WriteAheadLog"><code>WriteAheadLog</code></a>.</p>
 </div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Configuration.html" title="okaywal::Configuration struct">Configuration</a></div><div class="item-right docblock-short"><p>Controls a <a href="struct.WriteAheadLog.html" title="WriteAheadLog"><code>WriteAheadLog</code></a>’s behavior.</p>
