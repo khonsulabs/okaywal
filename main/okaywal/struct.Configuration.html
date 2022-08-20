@@ -12,7 +12,7 @@
     pub file_manager: FileManager,
 }</code></pre></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Controls a <a href="struct.WriteAheadLog.html" title="WriteAheadLog"><code>WriteAheadLog</code></a>’s behavior.</p>
 </div></details><h2 id="fields" class="fields small-section-header">Fields<a href="#fields" class="anchor"></a></h2><span id="structfield.version_info" class="structfield small-section-header"><a href="#structfield.version_info" class="anchor field"></a><code>version_info: <a class="struct" href="https://doc.rust-lang.org/1.63.0/alloc/vec/struct.Vec.html" title="struct alloc::vec::Vec">Vec</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/1.63.0/std/primitive.u8.html">u8</a>&gt;</code></span><div class="docblock"><p>This information is written to the start of each log segment, and is
-available for reading during <a href="trait.Checkpointer.html#tymethod.should_recover_segment" title="Checkpointer::should_recover_segment"><code>Checkpointer::should_recover_segment</code></a>. This
+available for reading during <a href="trait.Checkpointer.html#method.should_recover_segment" title="Checkpointer::should_recover_segment"><code>Checkpointer::should_recover_segment</code></a>. This
 field is intended to be used to identify the format of the data stored
 within the log, allowing for the format to change over time without
 breaking the abilty to recover existing log files during an upgrade.</p>
