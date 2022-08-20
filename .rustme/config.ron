@@ -40,6 +40,11 @@ Configuration(
                 release: "https://docs.rs/okaywal/*/okaywal/trait.Checkpointer.html",
                 for_docs: "Checkpointer",
             ),
+            "wal-recover": (
+                default: "https://khonsulabs.github.io/okaywal/main/okaywal/struct.WriteAheadLog.html#method.recover",
+                release: "https://docs.rs/okaywal/*/okaywal/struct.WriteAheadLog.html#method.recover",
+                for_docs: "WriteAheadLog::recover",
+            ),
         }
     ],
 )

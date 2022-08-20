@@ -26,10 +26,10 @@ This crate exposes a WAL that supports:
 
 ## Basic How-To
 
-[`WriteAheadLog::recover()`] is used to create or recover a WAL in a given
-directory. To open a log, an implementator of [`Checkpointer`](https://khonsulabs.github.io/okaywal/main/okaywal/trait.Checkpointer.html)
-must be provided. This trait is how OkayWAL communicates with your code when
-recovering or checkpointing a log.
+[`WriteAheadLog::recover()`](https://khonsulabs.github.io/okaywal/main/okaywal/struct.WriteAheadLog.html#method.recover) is used to create or recover a WAL
+in a given directory. To open a log, an implementator of
+[`Checkpointer`](https://khonsulabs.github.io/okaywal/main/okaywal/trait.Checkpointer.html) must be provided. This trait is how
+OkayWAL communicates with your code when recovering or checkpointing a log.
 
 The [basic example][basic-example] shows this process with many comments
 describing how OkayWAL works.
