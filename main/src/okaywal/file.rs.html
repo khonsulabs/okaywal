@@ -298,6 +298,14 @@
 <span id="292">292</span>
 <span id="293">293</span>
 <span id="294">294</span>
+<span id="295">295</span>
+<span id="296">296</span>
+<span id="297">297</span>
+<span id="298">298</span>
+<span id="299">299</span>
+<span id="300">300</span>
+<span id="301">301</span>
+<span id="302">302</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">std</span>::{
     <span class="ident">collections::HashMap</span>,
     <span class="ident">fs</span>::{<span class="self">self</span>, <span class="ident">OpenOptions</span>},
@@ -404,11 +412,12 @@
     }
 }
 
+<span class="doccomment">/// An open file.</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">File</span> {
-    <span class="kw">pub</span> <span class="ident">length</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span>,
-    <span class="kw">pub</span> <span class="ident">position</span>: <span class="ident">u64</span>,
-    <span class="kw">pub</span> <span class="ident">file</span>: <span class="ident">AnyFileKind</span>,
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">length</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span>,
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">position</span>: <span class="ident">u64</span>,
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">file</span>: <span class="ident">AnyFileKind</span>,
 }
 
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
@@ -418,7 +427,7 @@
 }
 
 <span class="kw">impl</span> <span class="ident">File</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">memory</span>() -&gt; <span class="self">Self</span> {
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">memory</span>() -&gt; <span class="self">Self</span> {
         <span class="self">Self</span> {
             <span class="ident">length</span>: <span class="prelude-val">None</span>,
             <span class="ident">position</span>: <span class="number">0</span>,
@@ -431,7 +440,7 @@
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">MemoryFile</span>(<span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">RwLock</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>);
 
 <span class="kw">impl</span> <span class="ident">File</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">len</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">io::Result</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">len</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">io::Result</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span> {
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">length</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">length</span> {
             <span class="prelude-val">Ok</span>(<span class="ident">length</span>)
         } <span class="kw">else</span> {
@@ -442,11 +451,11 @@
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">position</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u64</span> {
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">position</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u64</span> {
         <span class="self">self</span>.<span class="ident">position</span>
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_len</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">new_length</span>: <span class="ident">u64</span>) -&gt; <span class="ident">io::Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">set_len</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">new_length</span>: <span class="ident">u64</span>) -&gt; <span class="ident">io::Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">length</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">length</span>.<span class="ident">as_mut</span>().<span class="ident">expect</span>(<span class="string">&quot;writing to a reader&quot;</span>);
         <span class="kw">let</span> <span class="ident">was_at_end</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">length</span> <span class="op">==</span> <span class="self">self</span>.<span class="ident">position</span>;
         <span class="kw">match</span> <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">file</span> {
@@ -463,21 +472,21 @@
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">sync_data</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="ident">io::Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">sync_data</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="ident">io::Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
         <span class="kw">match</span> <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">file</span> {
             <span class="ident">AnyFileKind::Std</span> { <span class="ident">file</span> } =&gt; <span class="ident">file</span>.<span class="ident">sync_data</span>(),
             <span class="ident">AnyFileKind::Memory</span>(<span class="kw">_</span>) =&gt; <span class="prelude-val">Ok</span>(()),
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">lock_exclusive</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">io::Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">lock_exclusive</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">io::Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
         <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">file</span> {
             <span class="ident">AnyFileKind::Std</span> { <span class="ident">file</span> } =&gt; <span class="ident">file</span>.<span class="ident">lock_exclusive</span>(),
             <span class="ident">AnyFileKind::Memory</span>(<span class="kw">_</span>) =&gt; <span class="prelude-val">Ok</span>(()),
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">unlock</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">io::Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">unlock</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">io::Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
         <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">file</span> {
             <span class="ident">AnyFileKind::Std</span> { <span class="ident">file</span> } =&gt; <span class="ident">file</span>.<span class="ident">unlock</span>(),
             <span class="ident">AnyFileKind::Memory</span>(<span class="kw">_</span>) =&gt; <span class="prelude-val">Ok</span>(()),
@@ -543,6 +552,7 @@
     }
 }
 
+<span class="doccomment">/// An open file that has an exclusive file lock.</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">LockedFile</span> {
     <span class="ident">file</span>: <span class="ident">File</span>,
@@ -550,7 +560,7 @@
 }
 
 <span class="kw">impl</span> <span class="ident">LockedFile</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">file</span>: <span class="ident">File</span>) -&gt; <span class="self">Self</span> {
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">file</span>: <span class="ident">File</span>) -&gt; <span class="self">Self</span> {
         <span class="kw">let</span> <span class="ident">locked</span> <span class="op">=</span> <span class="ident">file</span>.<span class="ident">lock_exclusive</span>().<span class="ident">is_ok</span>();
         <span class="self">Self</span> { <span class="ident">file</span>, <span class="ident">locked</span> }
     }
@@ -590,6 +600,12 @@
 <span class="kw">impl</span> <span class="ident">Seek</span> <span class="kw">for</span> <span class="ident">LockedFile</span> {
     <span class="kw">fn</span> <span class="ident">seek</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">pos</span>: <span class="ident">io::SeekFrom</span>) -&gt; <span class="ident">io::Result</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span> {
         <span class="self">self</span>.<span class="ident">file</span>.<span class="ident">seek</span>(<span class="ident">pos</span>)
+    }
+}
+
+<span class="kw">impl</span> <span class="ident">Read</span> <span class="kw">for</span> <span class="ident">LockedFile</span> {
+    <span class="kw">fn</span> <span class="ident">read</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">buf</span>: <span class="kw-2">&amp;mut</span> [<span class="ident">u8</span>]) -&gt; <span class="ident">io::Result</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> {
+        <span class="self">self</span>.<span class="ident">file</span>.<span class="ident">read</span>(<span class="ident">buf</span>)
     }
 }
 </code></pre></div>
