@@ -28,10 +28,10 @@ preventing the WAL from growing too large.</li>
 <li>Interactive recovery process with basic data versioning support.</li>
 </ul>
 <h3 id="basic-how-to"><a href="#basic-how-to">Basic How-To</a></h3>
-<p><a href="struct.WriteAheadLog.html#method.recover" title="WriteAheadLog::recover()"><code>WriteAheadLog::recover()</code></a> is used to create or recover a WAL in a given
-directory. To open a log, an implementator of <a href="trait.Checkpointer.html"><code>Checkpointer</code></a>
-must be provided. This trait is how OkayWAL communicates with your code when
-recovering or checkpointing a log.</p>
+<p><a href="struct.WriteAheadLog.html#method.recover"><code>WriteAheadLog::recover()</code></a> is used to create or recover a WAL
+in a given directory. To open a log, an implementator of
+<a href="trait.Checkpointer.html"><code>Checkpointer</code></a> must be provided. This trait is how
+OkayWAL communicates with your code when recovering or checkpointing a log.</p>
 <p>The <a href="https://github.com/khonsulabs/okaywal/blob/main/examples/basic.rs">basic example</a> shows this process with many comments
 describing how OkayWAL works.</p>
 
