@@ -8,7 +8,10 @@ use std::{
 use parking_lot::Mutex;
 use tempfile::tempdir;
 
-use crate::{Checkpointer, Entry, EntryId, Error, Recovery, WriteAheadLog, NEW_ENTRY};
+use crate::{
+    file::{File, LockedFile},
+    Checkpointer, Entry, EntryId, Error, LogReader, Recovery, WriteAheadLog, NEW_ENTRY,
+};
 
 #[derive(Default, Debug, Clone)]
 struct LoggingCheckpointer {
@@ -42,7 +45,7 @@ impl Checkpointer for LoggingCheckpointer {
         Ok(Recovery::Recover)
     }
 
-    fn recover(&mut self, entry: &mut Entry<'_>) -> std::io::Result<()> {
+    fn recover(&mut self, entry: &mut Entry<'_, File>) -> std::io::Result<()> {
         let entry_id = entry.id;
 
         if let Some(chunks) = entry.read_all_chunks()? {
@@ -56,7 +59,11 @@ impl Checkpointer for LoggingCheckpointer {
         Ok(())
     }
 
-    fn checkpoint_to(&mut self, last_checkpointed_id: EntryId) -> std::io::Result<()> {
+    fn checkpoint_to(
+        &mut self,
+        last_checkpointed_id: EntryId,
+        _entries: &mut LogReader<LockedFile>,
+    ) -> std::io::Result<()> {
         let mut invocations = self.invocations.lock();
         invocations.push(CheckpointCall::Checkpoint {
             last_checkpointed_id,
@@ -124,7 +131,7 @@ impl Checkpointer for VerifyingCheckpointer {
         Ok(Recovery::Recover)
     }
 
-    fn recover(&mut self, entry: &mut Entry<'_>) -> std::io::Result<()> {
+    fn recover(&mut self, entry: &mut Entry<'_, File>) -> std::io::Result<()> {
         if let Some(chunks) = entry.read_all_chunks()? {
             let mut entries = self.entries.lock();
             entries.insert(entry.id, chunks);
@@ -133,9 +140,18 @@ impl Checkpointer for VerifyingCheckpointer {
         Ok(())
     }
 
-    fn checkpoint_to(&mut self, last_checkpointed_id: EntryId) -> std::io::Result<()> {
+    fn checkpoint_to(
+        &mut self,
+        last_checkpointed_id: EntryId,
+        reader: &mut LogReader<LockedFile>,
+    ) -> std::io::Result<()> {
         println!("Archiving through {last_checkpointed_id:?}");
         let mut entries = self.entries.lock();
+        while let Some(mut entry) = reader.read_entry()? {
+            let expected_data = entries.remove(&entry.id).expect("unknown entry id");
+            let stored_data = entry.read_all_chunks()?.expect("couldn't read chunks");
+            assert_eq!(expected_data, stored_data);
+        }
         entries.retain(|entry_id, _| *entry_id > last_checkpointed_id);
         Ok(())
     }

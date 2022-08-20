@@ -29,11 +29,11 @@ use std::{
     thread::JoinHandle,
 };
 
-use file::File;
+pub use file::{File, LockedFile};
 use parking_lot::{Condvar, Mutex};
 use watchable::{Watchable, Watcher};
 
-use crate::file::{AnyFileKind, FileManager, LockedFile};
+use crate::file::{AnyFileKind, FileManager};
 
 /// A Write-Ahead Log that enables atomic, durable writes.
 #[derive(Debug, Clone)]
@@ -93,7 +93,7 @@ impl WriteAheadLog {
                             position: 0,
                             file: AnyFileKind::Std { file },
                         })),
-                        active: false,
+                        status: SlotStatus::Inactive,
                     });
                 } else {
                     break;
@@ -186,14 +186,13 @@ impl WriteAheadLog {
 
                 return Ok(EntryWriter::new(self.clone(), slot_id, file)?);
             } else if segments.active_slot_count < self.data.config.active_segment_limit {
-                if let Some((slot_id, slot)) = segments
-                    .slots
-                    .iter_mut()
-                    .enumerate()
-                    .find(|(_, slot)| !slot.active)
+                if let Some((slot_id, slot)) =
+                    segments.slots.iter_mut().enumerate().find(|(_, slot)| {
+                        slot.status == SlotStatus::Inactive && slot.writer.is_some()
+                    })
                 {
-                    let file = slot.writer.take().expect("missing file");
-                    slot.active = true;
+                    let file = slot.writer.take().expect("checked above");
+                    slot.status = SlotStatus::Active;
                     segments.active_slot_count += 1;
 
                     return Ok(EntryWriter::new(
@@ -218,7 +217,7 @@ impl WriteAheadLog {
                     first_entry_id: None,
                     latest_entry_id: None,
                     writer: None,
-                    active: true,
+                    status: SlotStatus::Active,
                 });
 
                 return Ok(EntryWriter::new(
@@ -317,7 +316,7 @@ impl WriteAheadLog {
                 && segments.slots[slot_index].first_entry_id.unwrap() <= checkpoint_to
             {
                 notify_checkpoint = true;
-                segments.slots[slot_index].active = false;
+                segments.slots[slot_index].status = SlotStatus::Checkpointing;
                 segments.active_slot_count -= 1;
                 let latest_id = segments.slots[slot_index]
                     .latest_entry_id
@@ -355,69 +354,30 @@ impl WriteAheadLog {
         checkpointer: &mut A,
         config: &Configuration,
     ) -> io::Result<EntryId> {
-        let mut readers = Vec::with_capacity(files.slots.len());
-        let mut completed_readers = Vec::with_capacity(files.slots.len());
+        let mut log_reader = LogReader::default();
         let mut latest_entry_id = 0;
         for (index, slot) in files.slots.iter().enumerate() {
             let file = config.file_manager.read_path(&slot.path)?;
             let reader = SegmentReader::new(index, file)?;
             match checkpointer.should_recover_segment(&reader.header)? {
                 Recovery::Recover => {
-                    readers.push(reader);
+                    log_reader.readers.push(reader);
                 }
                 Recovery::Abandon => {
-                    completed_readers.push(reader);
+                    log_reader.completed_readers.push(reader);
                 }
             }
         }
 
-        while !readers.is_empty() {
-            // Find the next entry id in sequence across all remaining readers.
-            // If a reader has no more entries, remove it from consideration.
-            let mut lowest_entry_id_remaining = u64::MAX;
-            let mut lowest_entry_reader = None;
-            let mut index = 0;
-            while index < readers.len() {
-                if let Some(entry_id) = readers[index].current_entry_id() {
-                    if lowest_entry_reader.is_none() || entry_id.0 < lowest_entry_id_remaining {
-                        lowest_entry_reader = Some(index);
-                        lowest_entry_id_remaining = entry_id.0;
-                    }
-                    index += 1;
-                } else {
-                    // Reader is exhausted
-                    let reader = readers.remove(index);
-                    completed_readers.push(reader);
-                }
-            }
+        while let Some(mut entry) = log_reader.read_entry()? {
+            latest_entry_id = entry.id.0;
 
-            if let Some(lowest_entry_reader) = lowest_entry_reader {
-                let reader = &mut readers[lowest_entry_reader];
-
-                latest_entry_id = reader.current_entry_id.unwrap().0;
-                let mut entry = Entry {
-                    id: reader.current_entry_id.unwrap(),
-                    reader,
-                };
-                checkpointer.recover(&mut entry)?;
-                while let Some(mut chunk) = match entry.read_chunk()? {
-                    ReadChunkResult::Chunk(chunk) => Some(chunk),
-                    _ => None,
-                } {
-                    // skip chunk
-                    chunk.skip_remaining_bytes()?;
-                }
-
-                if !reader.read_next_entry()? {
-                    // No more entries.
-                    readers.remove(lowest_entry_reader);
-                }
-            }
+            checkpointer.recover(&mut entry)?;
         }
 
-        // We've now informed the checkpointer of all commits, we need to clean up
-        // the files (truncating any invalid data) and enqueue them.
-        for reader in completed_readers {
+        // We've now informed the checkpointer of all commits, we can clean up
+        // the files (if needed) and enqueue them for having new entries added.
+        for reader in log_reader.completed_readers {
             let slot = &mut files.slots[reader.slot_index];
             slot.first_entry_id = reader.first_entry_id;
             slot.latest_entry_id = reader.last_entry_id;
@@ -430,8 +390,6 @@ impl WriteAheadLog {
                 writer.set_len(reader.valid_until)?;
             }
 
-            // bytes_per_page is compatible, we can continue writing to
-            // this slot.
             files
                 .active_slots
                 .push_back(u16::try_from(reader.slot_index).unwrap());
@@ -481,20 +439,42 @@ impl WriteAheadLog {
                 }
             }
 
-            let mut checkpointer = data.checkpointer.lock();
-            checkpointer.checkpoint_to(entry_to_checkpoint_to)?;
-
-            for slot in segments
+            // Gather the files for the log reader
+            let mut log_reader = LogReader::default();
+            for (index, slot) in segments
                 .slots
                 .iter_mut()
-                .filter(|slot| slot.should_checkpoint(entry_to_checkpoint_to))
+                .enumerate()
+                .filter(|(_index, slot)| slot.should_checkpoint(entry_to_checkpoint_to))
             {
-                let writer = slot.writer.as_mut().unwrap();
+                log_reader.readers.push(SegmentReader::new(
+                    index,
+                    slot.writer.take().expect("checked in previous loop"),
+                )?);
+            }
+            drop(segments);
+
+            let mut checkpointer = data.checkpointer.lock();
+            checkpointer.checkpoint_to(entry_to_checkpoint_to, &mut log_reader)?;
+            drop(checkpointer);
+
+            let mut segments = data.segments.lock();
+
+            for reader in log_reader
+                .completed_readers
+                .into_iter()
+                .chain(log_reader.readers.into_iter())
+            {
+                let mut writer = reader.file.into_inner();
                 writer.set_len(0)?;
                 writer.seek(SeekFrom::Start(0))?;
-                data.config.write_segment_header(writer)?;
+                data.config.write_segment_header(&mut writer)?;
+
+                let slot = &mut segments.slots[reader.slot_index];
+                slot.writer = Some(writer);
                 slot.first_entry_id = None;
                 slot.latest_entry_id = None;
+                slot.status = SlotStatus::Inactive;
             }
         }
 
@@ -589,11 +569,15 @@ pub trait Checkpointer: Send + Sync + Debug {
     /// [`Entry::read_chunk()`] can be used to read each chunk of data that was
     /// written via [`EntryWriter::write_chunk`]. The order of chunks is guaranteed
     /// to be the same as the order they were written in.
-    fn recover(&mut self, entry: &mut Entry<'_>) -> io::Result<()>;
+    fn recover(&mut self, entry: &mut Entry<'_, File>) -> io::Result<()>;
 
     /// Invoked each time the [`WriteAheadLog`] is ready to recycle and reuse
     /// segment files.
-    fn checkpoint_to(&mut self, last_checkpointed_id: EntryId) -> io::Result<()>;
+    fn checkpoint_to(
+        &mut self,
+        last_checkpointed_id: EntryId,
+        checkpointed_entries: &mut LogReader<LockedFile>,
+    ) -> io::Result<()>;
 }
 
 /// Information about an individual segment of a [`WriteAheadLog`] that is being
@@ -615,12 +599,15 @@ pub struct EntryId(pub u64);
 /// Each entry is composed of a series of chunks of data that were previously
 /// written using [`EntryWriter::write_chunk`].
 #[derive(Debug)]
-pub struct Entry<'a> {
+pub struct Entry<'a, F: Read + Seek> {
     id: EntryId,
-    reader: &'a mut SegmentReader,
+    reader: &'a mut SegmentReader<F>,
 }
 
-impl<'entry> Entry<'entry> {
+impl<'entry, F> Entry<'entry, F>
+where
+    F: Read + Seek,
+{
     /// The unique id of this entry.
     #[must_use]
     pub const fn id(&self) -> EntryId {
@@ -644,29 +631,31 @@ impl<'entry> Entry<'entry> {
     /// the tradeoffs is not knowing the full length of an entry when it is
     /// being written. This allows for very large log entries to be written
     /// without requiring memory for the entire entry.
-    pub fn read_chunk<'chunk>(&'chunk mut self) -> io::Result<ReadChunkResult<'chunk, 'entry>> {
-        if self.reader.file.buffer().len() < 9 {
+    pub fn read_chunk<'chunk>(&'chunk mut self) -> io::Result<ReadChunkResult<'chunk, 'entry, F>> {
+        if self.reader.file.buffer().is_empty() {
             self.reader.file.fill_buf()?;
         }
 
-        if self.reader.file.buffer().len() > 9 && self.reader.file.buffer()[0] == CHUNK {
-            let mut header_bytes = [0; 9];
-            self.reader.file.read_exact(&mut header_bytes)?;
-            Ok(ReadChunkResult::Chunk(EntryChunk {
-                entry: self,
-                calculated_crc: 0,
-                stored_crc: u32::from_le_bytes(
-                    header_bytes[1..5].try_into().expect("u32 is 4 bytes"),
-                ),
-                bytes_remaining: u32::from_le_bytes(
-                    header_bytes[5..].try_into().expect("u32 is 4 bytes"),
-                ),
-            }))
-        } else if self.reader.file.buffer().first().copied() == Some(END_OF_ENTRY) {
-            self.reader.file.consume(1);
-            Ok(ReadChunkResult::EndOfEntry)
-        } else {
-            Ok(ReadChunkResult::AbortedEntry)
+        match self.reader.file.buffer().first().copied() {
+            Some(CHUNK) => {
+                let mut header_bytes = [0; 9];
+                self.reader.file.read_exact(&mut header_bytes)?;
+                Ok(ReadChunkResult::Chunk(EntryChunk {
+                    entry: self,
+                    calculated_crc: 0,
+                    stored_crc: u32::from_le_bytes(
+                        header_bytes[1..5].try_into().expect("u32 is 4 bytes"),
+                    ),
+                    bytes_remaining: u32::from_le_bytes(
+                        header_bytes[5..].try_into().expect("u32 is 4 bytes"),
+                    ),
+                }))
+            }
+            Some(END_OF_ENTRY) => {
+                self.reader.file.consume(1);
+                Ok(ReadChunkResult::EndOfEntry)
+            }
+            _ => Ok(ReadChunkResult::AbortedEntry),
         }
     }
 
@@ -689,9 +678,12 @@ impl<'entry> Entry<'entry> {
 
 /// The result of reading a chunk from a log segment.
 #[derive(Debug)]
-pub enum ReadChunkResult<'chunk, 'entry> {
+pub enum ReadChunkResult<'chunk, 'entry, F>
+where
+    F: Read + Seek,
+{
     /// A chunk was found.
-    Chunk(EntryChunk<'chunk, 'entry>),
+    Chunk(EntryChunk<'chunk, 'entry, F>),
     /// The end of the entry has been reached.
     EndOfEntry,
     /// An aborted entry was detected. This should only be encountered if log
@@ -703,14 +695,20 @@ pub enum ReadChunkResult<'chunk, 'entry> {
 
 /// A chunk of data previously written using [`EntryWriter::write_chunk`].
 #[derive(Debug)]
-pub struct EntryChunk<'chunk, 'entry> {
-    entry: &'chunk mut Entry<'entry>,
+pub struct EntryChunk<'chunk, 'entry, F>
+where
+    F: Read + Seek,
+{
+    entry: &'chunk mut Entry<'entry, F>,
     bytes_remaining: u32,
     stored_crc: u32,
     calculated_crc: u32,
 }
 
-impl<'chunk, 'entry> EntryChunk<'chunk, 'entry> {
+impl<'chunk, 'entry, F> EntryChunk<'chunk, 'entry, F>
+where
+    F: Read + Seek,
+{
     /// Returns the number of bytes remaining to read from this chunk.
     #[must_use]
     pub const fn bytes_remaining(&self) -> u32 {
@@ -748,7 +746,10 @@ impl<'chunk, 'entry> EntryChunk<'chunk, 'entry> {
     }
 }
 
-impl<'chunk, 'entry> Read for EntryChunk<'chunk, 'entry> {
+impl<'chunk, 'entry, F> Read for EntryChunk<'chunk, 'entry, F>
+where
+    F: Read + Seek,
+{
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         let bytes_remaining = usize::try_from(self.bytes_remaining).to_io()?;
         let bytes_to_read = bytes_remaining.min(buf.len());
@@ -799,7 +800,7 @@ impl SegmentFiles {
         while active_slot_index < self.active_slots.len() {
             let slot = &mut self.slots[usize::from(self.active_slots[active_slot_index])];
             if slot.first_entry_id.is_some() && slot.first_entry_id.unwrap() <= checkpoint_to {
-                slot.active = false;
+                slot.status = SlotStatus::Checkpointing;
                 // This segment contains data that needs to be checkpointed.
                 self.active_slots.remove(active_slot_index);
                 self.active_slot_count -= 1;
@@ -816,7 +817,14 @@ struct FileSlot {
     first_entry_id: Option<EntryId>,
     latest_entry_id: Option<EntryId>,
     writer: Option<LockedFile>,
-    active: bool,
+    status: SlotStatus,
+}
+
+#[derive(Debug, Eq, PartialEq)]
+enum SlotStatus {
+    Active,
+    Inactive,
+    Checkpointing,
 }
 
 impl FileSlot {
@@ -999,9 +1007,9 @@ impl<T> ToIoResult<T> for std::result::Result<T, TryFromIntError> {
 }
 
 #[derive(Debug)]
-struct SegmentReader {
+struct SegmentReader<F: Read + Seek> {
     slot_index: usize,
-    file: BufReader<File>,
+    file: BufReader<F>,
     header: RecoveredSegment,
     current_entry_id: Option<EntryId>,
     first_entry_id: Option<EntryId>,
@@ -1009,8 +1017,11 @@ struct SegmentReader {
     valid_until: u64,
 }
 
-impl SegmentReader {
-    pub fn new(slot_id: usize, file: File) -> io::Result<Self> {
+impl<F> SegmentReader<F>
+where
+    F: Read + Seek,
+{
+    pub fn new(slot_id: usize, file: F) -> io::Result<Self> {
         let mut file = BufReader::new(file);
         let mut buffer = Vec::with_capacity(256 + 5);
         buffer.resize(5, 0);
@@ -1062,6 +1073,7 @@ impl SegmentReader {
             self.file.fill_buf()?;
         }
 
+        self.valid_until = self.file.stream_position()?;
         let mut header_bytes = [0; 9];
         match self.file.read_exact(&mut header_bytes) {
             Ok(()) => {}
@@ -1074,6 +1086,9 @@ impl SegmentReader {
                 self.current_entry_id = Some(EntryId(u64::from_le_bytes(
                     header_bytes[1..].try_into().unwrap(),
                 )));
+                if self.first_entry_id.is_none() {
+                    self.first_entry_id = self.current_entry_id;
+                }
 
                 Ok(true)
             }
@@ -1085,6 +1100,90 @@ impl SegmentReader {
                 ErrorKind::InvalidData,
                 format!("invalid entry byte: {other}"),
             )),
+        }
+    }
+}
+
+/// Reads a collection of [`Entry`]s from a [`WriteAheadLog`].
+#[derive(Debug)]
+pub struct LogReader<F>
+where
+    F: Read + Seek,
+{
+    readers: Vec<SegmentReader<F>>,
+    completed_readers: Vec<SegmentReader<F>>,
+    current_entry_reader: Option<(usize, EntryId)>,
+}
+
+impl<F> Default for LogReader<F>
+where
+    F: Read + Seek,
+{
+    fn default() -> Self {
+        Self {
+            readers: Vec::default(),
+            completed_readers: Vec::default(),
+            current_entry_reader: None,
+        }
+    }
+}
+
+impl<F> LogReader<F>
+where
+    F: Read + Seek,
+{
+    /// Reads an entry from the log. If no more entries are found, None is
+    /// returned.
+    pub fn read_entry(&mut self) -> io::Result<Option<Entry<'_, F>>> {
+        if let Some((current_entry_reader, id)) = self.current_entry_reader.take() {
+            let reader = &mut self.readers[current_entry_reader];
+            let mut entry = Entry { id, reader };
+            while let Some(mut chunk) = match entry.read_chunk()? {
+                ReadChunkResult::Chunk(chunk) => Some(chunk),
+                _ => None,
+            } {
+                // skip chunk
+                chunk.skip_remaining_bytes()?;
+            }
+
+            if !reader.read_next_entry()? {
+                // No more entries.
+                self.completed_readers
+                    .push(self.readers.remove(current_entry_reader));
+            }
+        }
+
+        // Find the next entry id in sequence across all remaining readers.
+        // If a reader has no more entries, remove it from consideration.
+        let mut lowest_entry_id_remaining = u64::MAX;
+        let mut lowest_entry_reader = None;
+        let mut index = 0;
+        while index < self.readers.len() {
+            if let Some(entry_id) = self.readers[index].current_entry_id() {
+                if lowest_entry_reader.is_none() || entry_id.0 < lowest_entry_id_remaining {
+                    lowest_entry_reader = Some(index);
+                    lowest_entry_id_remaining = entry_id.0;
+                }
+                index += 1;
+            } else {
+                // Reader is exhausted
+                let reader = self.readers.remove(index);
+                self.completed_readers.push(reader);
+            }
+        }
+
+        if let Some(lowest_entry_reader) = lowest_entry_reader {
+            let reader = &mut self.readers[lowest_entry_reader];
+
+            let id = reader
+                .current_entry_id
+                .expect("precondition of being in queue");
+            let entry = Entry { id, reader };
+            self.current_entry_reader = Some((lowest_entry_reader, id));
+            Ok(Some(entry))
+        } else {
+            self.current_entry_reader = None;
+            Ok(None)
         }
     }
 }
@@ -1101,11 +1200,15 @@ impl Checkpointer for VoidCheckpointer {
         Ok(Recovery::Abandon)
     }
 
-    fn recover(&mut self, _entry: &mut Entry<'_>) -> io::Result<()> {
+    fn recover(&mut self, _entry: &mut Entry<'_, File>) -> io::Result<()> {
         Ok(())
     }
 
-    fn checkpoint_to(&mut self, _last_checkpointed_id: EntryId) -> io::Result<()> {
+    fn checkpoint_to(
+        &mut self,
+        _last_checkpointed_id: EntryId,
+        _reader: &mut LogReader<LockedFile>,
+    ) -> io::Result<()> {
         Ok(())
     }
 }

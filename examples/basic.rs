@@ -1,6 +1,9 @@
 use std::io::{self, Read};
 
-use okaywal::{Checkpointer, Entry, EntryId, RecoveredSegment, Recovery, WriteAheadLog};
+use okaywal::{
+    Checkpointer, Entry, EntryId, File, LockedFile, LogReader, RecoveredSegment, Recovery,
+    WriteAheadLog,
+};
 
 fn main() -> okaywal::Result<()> {
     // Open a log using an Checkpointer that echoes the information passed into each
@@ -57,7 +60,7 @@ impl Checkpointer for LoggingCheckpointer {
         Ok(Recovery::Recover)
     }
 
-    fn recover(&mut self, entry: &mut Entry<'_>) -> io::Result<()> {
+    fn recover(&mut self, entry: &mut Entry<'_, File>) -> io::Result<()> {
         if let Some(all_chunks) = entry.read_all_chunks()? {
             let all_chunks = all_chunks
                 .into_iter()
@@ -76,7 +79,11 @@ impl Checkpointer for LoggingCheckpointer {
         Ok(())
     }
 
-    fn checkpoint_to(&mut self, last_checkpointed_id: EntryId) -> io::Result<()> {
+    fn checkpoint_to(
+        &mut self,
+        last_checkpointed_id: EntryId,
+        _entries: &mut LogReader<LockedFile>,
+    ) -> io::Result<()> {
         println!("LoggingCheckpointer::recover({last_checkpointed_id:?}");
         Ok(())
     }

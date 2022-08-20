@@ -104,11 +104,12 @@ impl FileManager {
     }
 }
 
+/// An open file.
 #[derive(Debug)]
 pub struct File {
-    pub length: Option<u64>,
-    pub position: u64,
-    pub file: AnyFileKind,
+    pub(crate) length: Option<u64>,
+    pub(crate) position: u64,
+    pub(crate) file: AnyFileKind,
 }
 
 #[derive(Debug)]
@@ -118,7 +119,7 @@ pub enum AnyFileKind {
 }
 
 impl File {
-    pub fn memory() -> Self {
+    pub(crate) fn memory() -> Self {
         Self {
             length: None,
             position: 0,
@@ -131,7 +132,7 @@ impl File {
 pub struct MemoryFile(Arc<RwLock<Vec<u8>>>);
 
 impl File {
-    pub fn len(&self) -> io::Result<u64> {
+    pub(crate) fn len(&self) -> io::Result<u64> {
         if let Some(length) = self.length {
             Ok(length)
         } else {
@@ -142,11 +143,11 @@ impl File {
         }
     }
 
-    pub fn position(&self) -> u64 {
+    pub(crate) fn position(&self) -> u64 {
         self.position
     }
 
-    pub fn set_len(&mut self, new_length: u64) -> io::Result<()> {
+    pub(crate) fn set_len(&mut self, new_length: u64) -> io::Result<()> {
         let length = self.length.as_mut().expect("writing to a reader");
         let was_at_end = *length == self.position;
         match &mut self.file {
@@ -163,21 +164,21 @@ impl File {
         Ok(())
     }
 
-    pub fn sync_data(&mut self) -> io::Result<()> {
+    pub(crate) fn sync_data(&mut self) -> io::Result<()> {
         match &mut self.file {
             AnyFileKind::Std { file } => file.sync_data(),
             AnyFileKind::Memory(_) => Ok(()),
         }
     }
 
-    pub fn lock_exclusive(&self) -> io::Result<()> {
+    pub(crate) fn lock_exclusive(&self) -> io::Result<()> {
         match &self.file {
             AnyFileKind::Std { file } => file.lock_exclusive(),
             AnyFileKind::Memory(_) => Ok(()),
         }
     }
 
-    pub fn unlock(&self) -> io::Result<()> {
+    pub(crate) fn unlock(&self) -> io::Result<()> {
         match &self.file {
             AnyFileKind::Std { file } => file.unlock(),
             AnyFileKind::Memory(_) => Ok(()),
@@ -243,6 +244,7 @@ impl Read for File {
     }
 }
 
+/// An open file that has an exclusive file lock.
 #[derive(Debug)]
 pub struct LockedFile {
     file: File,
@@ -250,7 +252,7 @@ pub struct LockedFile {
 }
 
 impl LockedFile {
-    pub fn new(file: File) -> Self {
+    pub(crate) fn new(file: File) -> Self {
         let locked = file.lock_exclusive().is_ok();
         Self { file, locked }
     }
@@ -290,5 +292,11 @@ impl Write for LockedFile {
 impl Seek for LockedFile {
     fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
         self.file.seek(pos)
+    }
+}
+
+impl Read for LockedFile {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        self.file.read(buf)
     }
 }
