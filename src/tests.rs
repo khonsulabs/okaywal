@@ -164,7 +164,7 @@ fn multithreaded() {
         checkpointer,
         Configuration {
             active_segment_limit: 3,
-            checkpoint_after_bytes: 500_000,
+            checkpoint_after_bytes: 100_000,
             ..Configuration::default()
         },
     )
@@ -185,9 +185,13 @@ fn multithreaded() {
                     writer.write_chunk(&message).unwrap();
                     messages.push(message);
                 }
-                let entry_id = writer.commit().unwrap();
+                // Lock entries before pushing the commit to ensure that a
+                // checkpoint operation can't happen before we insert this
+                // entry.
                 let mut entries = written_entries.lock();
-                entries.insert(entry_id, messages);
+                entries.insert(writer.entry_id, messages);
+                drop(entries);
+                writer.commit().unwrap();
             }
         }));
     }
@@ -196,6 +200,7 @@ fn multithreaded() {
         thread.join().unwrap();
     }
 
+    wal.shutdown().unwrap();
     drop(wal);
 
     println!("Reopening log");

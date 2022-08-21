@@ -146,21 +146,23 @@ impl WriteAheadLog {
         segments.shutdown = true;
         let _ = self.data.checkpoint_to_sender.update(None);
 
-        // Wait for all active writers to return
-        while segments.slots.iter().any(|slot| slot.writer.is_none()) {
-            self.data.segments_sync.wait(&mut segments);
-        }
-        drop(segments);
-
         // Wait for the checkpointer to complete
         if let Some(thread) = self.data.checkpoint_thread.lock().take() {
+            drop(segments);
             match thread.join() {
                 Ok(result) => result?,
                 Err(_) => {
                     return Err(io::Error::from(ErrorKind::BrokenPipe));
                 }
             }
+            segments = self.data.segments.lock();
         }
+
+        // Wait for all active writers to return
+        while segments.slots.iter().any(|slot| slot.writer.is_none()) {
+            self.data.segments_sync.wait(&mut segments);
+        }
+        drop(segments);
 
         Ok(())
     }
@@ -177,14 +179,14 @@ impl WriteAheadLog {
         let mut segments = self.data.segments.lock();
         segments.check_shutdown()?;
 
-        loop {
+        let (slot_id, file) = loop {
             if let Some(slot_id) = segments.active_slots.pop_front() {
                 let file = segments.slots[usize::from(slot_id)]
                     .writer
                     .take()
                     .expect("missing file");
 
-                return Ok(EntryWriter::new(self.clone(), slot_id, file)?);
+                break (slot_id, file);
             } else if segments.active_slot_count < self.data.config.active_segment_limit {
                 if let Some((slot_id, slot)) =
                     segments.slots.iter_mut().enumerate().find(|(_, slot)| {
@@ -195,11 +197,7 @@ impl WriteAheadLog {
                     slot.status = SlotStatus::Active;
                     segments.active_slot_count += 1;
 
-                    return Ok(EntryWriter::new(
-                        self.clone(),
-                        u16::try_from(slot_id).to_io()?,
-                        file,
-                    )?);
+                    break (u16::try_from(slot_id).to_io()?, file);
                 }
 
                 // Open a new segment file
@@ -220,15 +218,19 @@ impl WriteAheadLog {
                     status: SlotStatus::Active,
                 });
 
-                return Ok(EntryWriter::new(
-                    self.clone(),
-                    u16::try_from(slot_id).to_io()?,
-                    file,
-                )?);
+                break (u16::try_from(slot_id).to_io()?, file);
             }
 
             self.data.segments_sync.wait(&mut segments);
+        };
+
+        let entry_id = EntryId(self.data.next_entry_id.fetch_add(1, Ordering::SeqCst));
+        let slot = &mut segments.slots[usize::from(slot_id)];
+        if slot.first_entry_id.is_none() {
+            slot.first_entry_id = Some(entry_id);
         }
+
+        Ok(EntryWriter::new(self.clone(), entry_id, slot_id, file)?)
     }
 
     /// Opens the log to read previously written data.
@@ -870,8 +872,12 @@ const CHUNK: u8 = 2;
 const END_OF_ENTRY: u8 = 3;
 
 impl EntryWriter {
-    fn new(log: WriteAheadLog, slot_id: u16, file: LockedFile) -> io::Result<Self> {
-        let entry_id = EntryId(log.data.next_entry_id.fetch_add(1, Ordering::SeqCst));
+    fn new(
+        log: WriteAheadLog,
+        entry_id: EntryId,
+        slot_id: u16,
+        file: LockedFile,
+    ) -> io::Result<Self> {
         let original_file_length = file.len()?;
         let mut file = BufWriter::new(file);
 
@@ -1035,7 +1041,8 @@ impl<F> SegmentReader<F>
 where
     F: Read + Seek,
 {
-    pub fn new(slot_id: usize, file: F) -> io::Result<Self> {
+    pub fn new(slot_id: usize, mut file: F) -> io::Result<Self> {
+        file.seek(SeekFrom::Start(0))?;
         let mut file = BufReader::new(file);
         let mut buffer = Vec::with_capacity(256 + 5);
         buffer.resize(5, 0);
