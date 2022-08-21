@@ -32,7 +32,7 @@ OkayWAL communicates with your code when recovering or checkpointing a log.
 The [basic example][basic-example] shows this process with many comments
 describing how OkayWAL works.
 
-```rust
+```rust,ignore
 $../examples/basic.rs:readme-example$
 ```
 

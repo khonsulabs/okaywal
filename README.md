@@ -34,7 +34,7 @@ OkayWAL communicates with your code when recovering or checkpointing a log.
 The [basic example][basic-example] shows this process with many comments
 describing how OkayWAL works.
 
-```rust
+```rust,ignore
 // Open a log using an Checkpointer that echoes the information passed into each
 // function that the Checkpointer trait defines.
 let log = WriteAheadLog::recover("my-log", LoggingCheckpointer)?;

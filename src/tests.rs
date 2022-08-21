@@ -10,7 +10,8 @@ use tempfile::tempdir;
 
 use crate::{
     file::{File, LockedFile},
-    Checkpointer, Entry, EntryId, Error, LogReader, Recovery, WriteAheadLog, NEW_ENTRY,
+    Checkpointer, Configuration, Entry, EntryId, Error, LogReader, Recovery, WriteAheadLog,
+    NEW_ENTRY,
 };
 
 #[derive(Default, Debug, Clone)]
@@ -158,9 +159,18 @@ fn multithreaded() {
 
     let checkpointer = VerifyingCheckpointer::default();
     let original_entries = checkpointer.entries.clone();
-    let wal = WriteAheadLog::recover(&dir, checkpointer).unwrap();
+    let wal = WriteAheadLog::recover_with_config(
+        &dir,
+        checkpointer,
+        Configuration {
+            active_segment_limit: 3,
+            checkpoint_after_bytes: 500_000,
+            ..Configuration::default()
+        },
+    )
+    .unwrap();
 
-    for _ in 0..8 {
+    for _ in 0..5 {
         let wal = wal.clone();
         let written_entries = original_entries.clone();
         threads.push(std::thread::spawn(move || {
