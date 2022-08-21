@@ -35,7 +35,7 @@ OkayWAL communicates with your code when recovering or checkpointing a log.</p>
 <p>The <a href="https://github.com/khonsulabs/okaywal/blob/main/examples/basic.rs">basic example</a> shows this process with many comments
 describing how OkayWAL works.</p>
 
-<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="comment">// Open a log using an Checkpointer that echoes the information passed into each</span>
+<div class='information'><div class='tooltip ignore'>ⓘ</div></div><div class="example-wrap"><pre class="rust rust-example-rendered ignore"><code><span class="comment">// Open a log using an Checkpointer that echoes the information passed into each</span>
 <span class="comment">// function that the Checkpointer trait defines.</span>
 <span class="kw">let</span> <span class="ident">log</span> <span class="op">=</span> <span class="ident">WriteAheadLog::recover</span>(<span class="string">&quot;my-log&quot;</span>, <span class="ident">LoggingCheckpointer</span>)<span class="question-mark">?</span>;
 
