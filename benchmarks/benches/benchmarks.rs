@@ -2,10 +2,10 @@ use std::{convert::Infallible, fmt::Display, sync::Arc};
 
 use okaywal::{Configuration, VoidCheckpointer, WriteAheadLog};
 use tempfile::TempDir;
-use timings::{Benchmark, BenchmarkImplementation, Label, Timings};
+use timings::{Benchmark, BenchmarkImplementation, Label, LabeledTimings, Timings};
 
 fn main() {
-    let (measurements, stats) = Timings::new();
+    let measurements = Timings::default();
     let bench = Benchmark::for_each_config(vec![
         InsertConfig {
             number_of_bytes: 256,
@@ -32,9 +32,7 @@ fn main() {
 
     bench.run(&measurements).unwrap();
 
-    drop(measurements);
-
-    let stats = stats.join().unwrap();
+    let stats = measurements.wait_for_stats();
     timings::print_table_summaries(&stats).unwrap();
 }
 
@@ -45,7 +43,6 @@ struct InsertConfig {
 }
 
 struct OkayWal {
-    number_of_threads: usize,
     config: InsertConfig,
     _dir: Arc<TempDir>,
     log: WriteAheadLog,
@@ -53,6 +50,10 @@ struct OkayWal {
 
 impl BenchmarkImplementation<Label, InsertConfig, Infallible> for OkayWal {
     type SharedConfig = (InsertConfig, Arc<TempDir>, WriteAheadLog);
+
+    fn label(number_of_threads: usize, _config: &InsertConfig) -> Label {
+        Label::from(format!("okaywal-{:02}t", number_of_threads))
+    }
 
     fn initialize_shared_config(
         number_of_threads: usize,
@@ -76,23 +77,21 @@ impl BenchmarkImplementation<Label, InsertConfig, Infallible> for OkayWal {
     }
 
     fn initialize(
-        number_of_threads: usize,
+        _number_of_threads: usize,
         (config, dir, log): Self::SharedConfig,
     ) -> Result<Self, Infallible> {
         Ok(Self {
             config,
-            number_of_threads,
             log,
             _dir: dir,
         })
     }
 
-    fn measure(&mut self, measurements: &timings::Timings<Label>) -> Result<(), Infallible> {
-        let label = Label::from(format!("okaywal-{:02}t", self.number_of_threads));
+    fn measure(&mut self, measurements: &LabeledTimings<Label>) -> Result<(), Infallible> {
         let metric = Label::from(format!("commit-{}", Bytes(self.config.number_of_bytes)));
         let data = vec![42; self.config.number_of_bytes];
         for _ in 0..self.config.iters {
-            let measurement = measurements.begin(label.clone(), metric.clone());
+            let measurement = measurements.begin(metric.clone());
             let mut session = self.log.write().unwrap();
             session.write_chunk(&data).unwrap();
             session.commit().unwrap();
@@ -107,7 +106,6 @@ mod shardedlog {
     use super::*;
 
     pub struct ShardedLog {
-        number_of_threads: usize,
         config: InsertConfig,
         _dir: Arc<TempDir>,
         log: sharded_log::ShardedLog,
@@ -115,6 +113,10 @@ mod shardedlog {
 
     impl BenchmarkImplementation<Label, InsertConfig, Infallible> for ShardedLog {
         type SharedConfig = (InsertConfig, Arc<TempDir>, sharded_log::ShardedLog);
+
+        fn label(number_of_threads: usize, _config: &InsertConfig) -> Label {
+            Label::from(format!("sharded-log-{:02}t", number_of_threads))
+        }
 
         fn initialize_shared_config(
             number_of_threads: usize,
@@ -136,23 +138,21 @@ mod shardedlog {
         }
 
         fn initialize(
-            number_of_threads: usize,
+            _number_of_threads: usize,
             (config, dir, log): Self::SharedConfig,
         ) -> Result<Self, Infallible> {
             Ok(Self {
                 config,
-                number_of_threads,
                 log,
                 _dir: dir,
             })
         }
 
-        fn measure(&mut self, measurements: &timings::Timings<Label>) -> Result<(), Infallible> {
-            let label = Label::from(format!("sharded-log-{:02}t", self.number_of_threads));
+        fn measure(&mut self, measurements: &LabeledTimings<Label>) -> Result<(), Infallible> {
             let metric = Label::from(format!("commit-{}", Bytes(self.config.number_of_bytes)));
             let data = vec![42; self.config.number_of_bytes];
             for _ in 0..self.config.iters {
-                let measurement = measurements.begin(label.clone(), metric.clone());
+                let measurement = measurements.begin(metric.clone());
                 self.log.write_batch(&[&data]).unwrap();
                 self.log.flush().unwrap();
                 measurement.finish();

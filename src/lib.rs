@@ -312,7 +312,7 @@ impl WriteAheadLog {
 
         let mut notify_segment = false;
         let mut notify_checkpoint = false;
-        let checkpoint_to = *self.data.checkpoint_to_sender.write();
+        let checkpoint_to = self.data.checkpoint_to_sender.get();
         if let Some(checkpoint_to) = checkpoint_to {
             if segments.slots[slot_index].first_entry_id.is_some()
                 && segments.slots[slot_index].first_entry_id.unwrap() <= checkpoint_to
@@ -434,7 +434,7 @@ impl WriteAheadLog {
                 data.checkpoint_sync.wait(&mut segments);
                 // Other files may have been returned that need to be
                 // checkpointed but have a later entry id.
-                if let Some(latest_entry) = *data.checkpoint_to_sender.write() {
+                if let Some(latest_entry) = data.checkpoint_to_sender.get() {
                     entry_to_checkpoint_to = latest_entry;
                 } else {
                     break 'checkpoint_loop;
