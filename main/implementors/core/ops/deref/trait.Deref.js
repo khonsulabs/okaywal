@@ -1,3 +1,0 @@
-(function() {var implementors = {};
-implementors["okaywal"] = [{"text":"impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.63.0/core/ops/deref/trait.Deref.html\" title=\"trait core::ops::deref::Deref\">Deref</a> for <a class=\"struct\" href=\"okaywal/struct.LockedFile.html\" title=\"struct okaywal::LockedFile\">LockedFile</a>","synthetic":false,"types":["okaywal::file::LockedFile"]}];
-if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()
