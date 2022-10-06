@@ -52,41 +52,9 @@ where
         self.position
     }
 
-    // pub fn set_len(&mut self, new_length: u64) -> io::Result<()> {
-    //     let cursor_is_at_end = self.position() == self.len()?;
-
-    //     // update the underlying file
-    //     self.file.set_len(new_length)?;
-    //     self.length = new_length;
-
-    //     if cursor_is_at_end {
-    //         self.seek(SeekFrom::Start(new_length))?;
-    //     }
-
-    //     Ok(())
-    // }
-
     pub fn inner(&self) -> &F {
         &self.file
     }
-
-    // pub fn inner_mut(&mut self) -> &mut F {
-    //     &mut self.file
-    // }
-
-    // pub fn len(&self) -> io::Result<u64> {
-    //     let buffer_end = self.position + u64::try_from(self.buffer.len()).to_io()?;
-    //     let actual_length = self.file.len()?;
-    //     Ok(actual_length.max(buffer_end))
-    // }
-
-    // pub fn is_full(&self) -> bool {
-    //     self.buffer.len() == self.buffer.capacity()
-    // }
-
-    // pub fn is_empty(&self) -> bool {
-    //     self.len().unwrap_or(0) > 0
-    // }
 }
 
 impl<F> Write for Buffered<F>
@@ -100,13 +68,13 @@ where
 
         // If what we're writing is larger than our buffer, skip the buffer
         // entirely.
-        // if buf.len() > self.buffer.capacity() {
-        //     // Ensure what we've buffered is already written.
-        //     self.flush_buffer()?;
-        //     let bytes_written = self.file.write(buf)?;
-        //     self.position += u64::try_from(bytes_written).to_io()?;
-        //     return Ok(bytes_written);
-        // }
+        if buf.len() > self.buffer.capacity() {
+            // Ensure what we've buffered is already written.
+            self.flush_buffer()?;
+            let bytes_written = self.file.write(buf)?;
+            self.position += u64::try_from(bytes_written).to_io()?;
+            return Ok(bytes_written);
+        }
 
         let bytes_remaining = self.buffer.capacity() - self.buffer_write_position;
         let bytes_to_write = buf.len().min(bytes_remaining);

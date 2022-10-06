@@ -251,20 +251,6 @@ impl LogFileWriter {
 
 impl Write for LogFileWriter {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        // if self.file.is_full() {
-        //     // Writing more bytes will extend the file, we should pre-allocate
-        //     // additional bytes.
-        //     let current_position = self.file.position();
-        //     let length_after_write = current_position + u64::try_from(buf.len()).to_io()?;
-        //     // Round the new length up to the next multiple of our preallocation length.
-        //     let new_length = (length_after_write + self.preallocate_bytes - 1)
-        //         / self.preallocate_bytes
-        //         * self.preallocate_bytes;
-
-        //     self.file.set_len(new_length)?;
-        //     self.file.seek(SeekFrom::Start(current_position))?;
-        // }
-
         let bytes_written = self.file.write(buf)?;
 
         Ok(bytes_written)
