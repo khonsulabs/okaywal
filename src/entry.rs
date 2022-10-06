@@ -1,7 +1,4 @@
-use std::{
-    io::{self, Write},
-    path::{Path, PathBuf},
-};
+use std::io::{self, Write};
 
 use crate::{
     log_file::{LogFile, LogFileWriter},
@@ -40,11 +37,6 @@ impl<'a> EntryWriter<'a> {
             file: Some(file),
             original_length,
         })
-    }
-
-    pub(crate) fn path(&self) -> PathBuf {
-        let file = self.file.as_ref().unwrap().lock();
-        file.path().to_owned()
     }
 
     /// Returns the unique id of the log entry being written.

@@ -94,7 +94,7 @@ impl LogFile {
                 if data.buffer_position() < target_synced_bytes {
                     data.file.flush()?;
                 }
-                let synchronized_length = data.position();
+                let synchronized_length = data.buffer_position();
 
                 // Get a duplicate handle we can use to call sync_data with while the
                 // mutex isn't locked.
@@ -264,7 +264,6 @@ impl Write for LogFileWriter {
 /// Reads a log segment, which contains one or more log entries.
 #[derive(Debug)]
 pub struct SegmentReader {
-    pub(crate) path: PathBuf,
     pub(crate) file: BufReader<File>,
     pub(crate) header: RecoveredSegment,
     pub(crate) current_entry_id: Option<EntryId>,
@@ -305,7 +304,6 @@ impl SegmentReader {
         };
 
         Ok(Self {
-            path: path.to_path_buf(),
             file,
             header,
             current_entry_id: None,

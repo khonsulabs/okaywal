@@ -136,10 +136,7 @@ impl LogManager for VerifyingCheckpointer {
         last_checkpointed_id: EntryId,
         reader: &mut SegmentReader,
     ) -> std::io::Result<()> {
-        println!(
-            "Checkpointed {} to {last_checkpointed_id:?}",
-            reader.path.display()
-        );
+        println!("Checkpointed to {last_checkpointed_id:?}");
         let mut entries = self.entries.lock();
         while let Some(mut entry) = reader.read_entry().unwrap() {
             let expected_data = entries.remove(&entry.id).expect("unknown entry id");
