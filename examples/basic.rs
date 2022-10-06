@@ -85,7 +85,7 @@ impl LogManager for LoggingCheckpointer {
 }
 
 #[test]
-fn test() -> okaywal::Result<()> {
+fn test() -> io::Result<()> {
     // Clean up any previous runs of this example.
     let path = std::path::Path::new("my-log");
     if path.exists() {
