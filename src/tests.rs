@@ -136,14 +136,17 @@ impl LogManager for VerifyingCheckpointer {
         last_checkpointed_id: EntryId,
         reader: &mut SegmentReader,
     ) -> std::io::Result<()> {
-        println!("Checkpointed to {last_checkpointed_id:?}");
+        println!(
+            "Checkpointed {} to {last_checkpointed_id:?}",
+            reader.path.display()
+        );
         let mut entries = self.entries.lock();
         while let Some(mut entry) = reader.read_entry().unwrap() {
             let expected_data = entries.remove(&entry.id).expect("unknown entry id");
             let stored_data = entry
                 .read_all_chunks()
                 .unwrap()
-                .expect("couldn't read chunks");
+                .expect("encountered aborted entry");
             assert_eq!(expected_data, stored_data);
         }
         entries.retain(|entry_id, _| *entry_id > last_checkpointed_id);
@@ -169,6 +172,7 @@ fn multithreaded() {
             for _ in 1..100 {
                 let mut messages = Vec::with_capacity(rng.usize(1..=8));
                 let mut writer = wal.begin_entry().unwrap();
+                println!("Writing to {}", writer.path().display());
                 for _ in 0..messages.capacity() {
                     let message = repeat_with(|| 42)
                         .take(rng.usize(..65_536))

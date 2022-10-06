@@ -264,6 +264,7 @@ impl Write for LogFileWriter {
 /// Reads a log segment, which contains one or more log entries.
 #[derive(Debug)]
 pub struct SegmentReader {
+    pub(crate) path: PathBuf,
     pub(crate) file: BufReader<File>,
     pub(crate) header: RecoveredSegment,
     pub(crate) current_entry_id: Option<EntryId>,
@@ -304,6 +305,7 @@ impl SegmentReader {
         };
 
         Ok(Self {
+            path: path.to_path_buf(),
             file,
             header,
             current_entry_id: None,
