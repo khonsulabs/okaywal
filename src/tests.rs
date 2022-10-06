@@ -166,10 +166,9 @@ fn multithreaded() {
         let written_entries = original_entries.clone();
         threads.push(std::thread::spawn(move || {
             let rng = fastrand::Rng::new();
-            for _ in 1..100 {
+            for _ in 1..10 {
                 let mut messages = Vec::with_capacity(rng.usize(1..=8));
                 let mut writer = wal.begin_entry().unwrap();
-                println!("Writing to {}", writer.path().display());
                 for _ in 0..messages.capacity() {
                     let message = repeat_with(|| 42)
                         .take(rng.usize(..65_536))
