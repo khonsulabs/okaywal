@@ -1,3 +1,18 @@
+#![doc = include_str!(".crate-docs.md")]
+#![forbid(unsafe_code)]
+#![warn(
+    clippy::cargo,
+    missing_docs,
+    clippy::pedantic,
+    future_incompatible,
+    rust_2018_idioms
+)]
+#![allow(
+    clippy::option_if_let_else,
+    clippy::module_name_repetitions,
+    clippy::missing_errors_doc
+)]
+
 use std::{
     collections::VecDeque,
     fs::{self, File},
@@ -10,14 +25,13 @@ use std::{
 
 use parking_lot::{Condvar, Mutex, MutexGuard};
 
-use crate::{entry::LogPosition, log_file::LogFile, to_io_result::ToIoResult};
-
 pub use crate::{
     config::Configuration,
     entry::{EntryId, EntryWriter},
-    log_file::{Entry, ReadChunkResult, RecoveredSegment, SegmentReader},
+    log_file::{Entry, EntryChunk, ReadChunkResult, RecoveredSegment, SegmentReader},
     manager::{LogManager, LogVoid, Recovery},
 };
+use crate::{entry::LogPosition, log_file::LogFile, to_io_result::ToIoResult};
 
 mod buffered;
 mod config;
@@ -26,6 +40,22 @@ mod log_file;
 mod manager;
 mod to_io_result;
 
+/// A [Write-Ahead Log][wal] that provides atomic and durable writes.
+///
+/// This type implements [`Clone`] and can be passed between multiple threads
+/// safely.
+///
+/// When [`WriteAheadLog::begin_entry()`] is called, an exclusive lock to the
+/// active log segment is acquired. The lock is released when the entry is
+/// [rolled back](entry::EntryWriter::rollback) or once the entry is in queue
+/// for synchronization during
+/// [`EntryWriter::commit()`](entry::EntryWriter::commit).
+///
+/// Multiple threads may be queued for synchronization at any given time. This
+/// allows good multi-threaded performance in spite of only using a single
+/// active file.
+///
+/// [wal]: https://en.wikipedia.org/wiki/Write-ahead_logging
 #[derive(Debug, Clone)]
 pub struct WriteAheadLog {
     data: Arc<Data>,
@@ -52,14 +82,19 @@ struct Files {
 }
 
 impl WriteAheadLog {
+    /// Creates or opens a log in `directory` using the provided log manager to
+    /// drive recovery and checkpointing.
     pub fn recover<AsRefPath: AsRef<Path>, Manager: LogManager>(
-        path: AsRefPath,
+        directory: AsRefPath,
         manager: Manager,
     ) -> io::Result<Self> {
-        Configuration::default_for(path).open(manager)
+        Configuration::default_for(directory).open(manager)
     }
 
     fn open<Manager: LogManager>(config: Configuration, mut manager: Manager) -> io::Result<Self> {
+        if !config.directory.exists() {
+            std::fs::create_dir_all(&config.directory)?;
+        }
         // Find all files that match this pattern: "wal-[0-9]+(-cp)?"
         let mut discovered_files = Vec::new();
         for file in fs::read_dir(&config.directory)?.filter_map(Result::ok) {
@@ -71,7 +106,7 @@ impl WriteAheadLog {
                 match (prefix, entry_id, suffix) {
                     (Some(prefix), Some(entry_id), suffix) if prefix == "wal" => {
                         let has_checkpointed = suffix == Some("cp");
-                        discovered_files.push(dbg!((entry_id, file.path(), has_checkpointed)));
+                        discovered_files.push((entry_id, file.path(), has_checkpointed));
                     }
                     _ => {}
                 }
@@ -158,15 +193,23 @@ impl WriteAheadLog {
         Ok(wal)
     }
 
-    pub fn begin_entry(&self) -> io::Result<EntryWriter> {
+    /// Begins writing an entry to this log.
+    ///
+    /// A new unique entry id will be allocated for the entry being written. If
+    /// the entry is rolled back, the entry id will not be reused. The entry id
+    /// can be retrieved through [`EntryWriter::id()`](entry::EntryWriter::id).
+    ///
+    /// This call will acquire an exclusive lock to the active file or block
+    /// until it can be acquired.
+    pub fn begin_entry(&self) -> io::Result<EntryWriter<'_>> {
         let mut files = self.data.files.lock();
         let file = loop {
             if let Some(file) = files.active.take() {
                 break file;
-            } else {
-                // Wait for a free file
-                self.data.active_sync.wait(&mut files);
             }
+
+            // Wait for a free file
+            self.data.active_sync.wait(&mut files);
         };
         files.last_entry_id.0 += 1;
         let entry_id = files.last_entry_id;
@@ -246,7 +289,6 @@ impl WriteAheadLog {
                 writer = file_to_checkpoint.synchronize_locked(writer, synchronize_target)?;
             }
             if let Some(entry_id) = writer.last_entry_id() {
-                println!("{} -> {}", writer.path().display(), entry_id.0);
                 let mut reader = SegmentReader::new(writer.path())?;
                 let mut manager = wal.data.manager.lock();
                 manager.checkpoint_to(entry_id, &mut reader)?;
@@ -325,6 +367,14 @@ impl WriteAheadLog {
         Ok(file)
     }
 
+    /// Waits for all other instances of [`WriteAheadLog`] to be dropped and for
+    /// the checkpointing thread to complete.
+    ///
+    /// This call will not interrupt any writers, and will block indefinitely if
+    /// another instance of this [`WriteAheadLog`] exists and is not eventually
+    /// dropped. This was is the safest to implement, and because a WAL is
+    /// primarily used in front of another storage layer, it follows that the
+    /// shutdown logic of both layers should be synchronized.
     pub fn shutdown(self) -> io::Result<()> {
         let mut checkpoint_thread = self.data.checkpoint_thread.lock();
         let join_handle = checkpoint_thread.take().expect("shutdown already invoked");
@@ -358,6 +408,7 @@ impl Files {
     }
 }
 
+#[derive(Clone, Copy)]
 enum WriteResult {
     RolledBack,
     Entry { new_length: u64 },

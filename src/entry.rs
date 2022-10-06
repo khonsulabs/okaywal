@@ -6,6 +6,10 @@ use crate::{
     WriteAheadLog, WriteResult,
 };
 
+/// A writer for an entry in a [`WriteAheadLog`].
+///
+/// Only one writer can be active for a given [`WriteAheadLog`] at any given
+/// time. See [`WriteAheadLog::begin_entry()`] for more information.
 #[derive(Debug)]
 pub struct EntryWriter<'a> {
     id: EntryId,
@@ -35,12 +39,18 @@ impl<'a> EntryWriter<'a> {
         })
     }
 
+    /// Returns the unique id of the log entry being written.
+    #[must_use]
     pub const fn id(&self) -> EntryId {
         self.id
     }
 
     /// Commits this entry to the log. Once this call returns, all data is
     /// atomically updated and synchronized to disk.
+    ///
+    /// While the entry is being committed, other writers will be allowed to
+    /// write to the log. See [`WriteAheadLog::begin_entry()`] for more
+    /// information.
     pub fn commit(self) -> io::Result<EntryId> {
         self.commit_and(|_file| Ok(()))
     }
@@ -84,7 +94,7 @@ impl<'a> EntryWriter<'a> {
     }
 
     /// Appends a chunk of data to this log entry. Each chunk of data is able to
-    /// be read using [`Entry::read_chunk`].
+    /// be read using [`Entry::read_chunk`](crate::Entry).
     pub fn write_chunk(&mut self, data: &[u8]) -> io::Result<ChunkRecord> {
         let length = u32::try_from(data.len()).to_io()?;
         let mut file = self.file.as_ref().expect("already dropped").lock();

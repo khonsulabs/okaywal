@@ -19,10 +19,10 @@ fn main() {
             number_of_bytes: 4096,
             iters: 125,
         },
-        // InsertConfig {
-        //     number_of_bytes: 1024 * 1024,
-        //     iters: 75,
-        // },
+        InsertConfig {
+            number_of_bytes: 1024 * 1024,
+            iters: 75,
+        },
     ])
     .with_each_number_of_threads([1, 2, 4, 8, 16])
     .with::<OkayWal>();

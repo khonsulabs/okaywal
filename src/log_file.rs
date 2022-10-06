@@ -261,6 +261,7 @@ impl Write for LogFileWriter {
     }
 }
 
+/// Reads a log segment, which contains one or more log entries.
 #[derive(Debug)]
 pub struct SegmentReader {
     pub(crate) file: BufReader<File>,
@@ -312,10 +313,6 @@ impl SegmentReader {
         })
     }
 
-    pub fn current_entry_id(&mut self) -> Option<EntryId> {
-        self.current_entry_id
-    }
-
     fn read_next_entry(&mut self) -> io::Result<bool> {
         if self.file.buffer().is_empty() {
             self.file.fill_buf()?;
@@ -329,21 +326,18 @@ impl SegmentReader {
             Err(err) => return Err(err),
         }
 
-        match header_bytes[0] {
-            NEW_ENTRY => {
-                self.current_entry_id = Some(EntryId(u64::from_le_bytes(
-                    header_bytes[1..].try_into().unwrap(),
-                )));
-                if self.first_entry_id.is_none() {
-                    self.first_entry_id = self.current_entry_id;
-                }
+        if let NEW_ENTRY = header_bytes[0] {
+            self.current_entry_id = Some(EntryId(u64::from_le_bytes(
+                header_bytes[1..].try_into().unwrap(),
+            )));
+            if self.first_entry_id.is_none() {
+                self.first_entry_id = self.current_entry_id;
+            }
 
-                Ok(true)
-            }
-            _ => {
-                self.current_entry_id = None;
-                Ok(false)
-            }
+            Ok(true)
+        } else {
+            self.current_entry_id = None;
+            Ok(false)
         }
     }
 
@@ -376,10 +370,10 @@ impl SegmentReader {
     }
 }
 
-/// A stored entry inside of a [`WriteAheadLog`].
+/// A stored entry inside of a [`WriteAheadLog`](crate::WriteAheadLog).
 ///
 /// Each entry is composed of a series of chunks of data that were previously
-/// written using [`EntryWriter::write_chunk`].
+/// written using [`EntryWriter::write_chunk`](crate::EntryWriter::write_chunk).
 #[derive(Debug)]
 pub struct Entry<'a> {
     pub(crate) id: EntryId,
@@ -475,7 +469,22 @@ pub enum ReadChunkResult<'chunk, 'entry> {
     AbortedEntry,
 }
 
-/// A chunk of data previously written using [`EntryWriter::write_chunk`].
+/// A chunk of data previously written using
+/// [`EntryWriter::write_chunk`](crate::EntryWriter::write_chunk).
+///
+/// # Panics
+///
+/// Once dropped, this type will ensure that the entry reader is advanced to the
+/// end of this chunk if needed by calling
+/// [`EntryChunk::skip_remaining_bytes()`]. If an error occurs during this call,
+/// a panic will occur.
+///
+/// To prevent all possibilities of panics, all bytes should be exhausted before
+/// dropping this type by:
+///
+/// - Using [`Read`] until a 0 is returned.
+/// - Using [`EntryChunk::read_all()`] to read all remaining bytes at once.
+/// - Skipping all remaining bytes using [`EntryChunk::skip_remaining_bytes()`]
 #[derive(Debug)]
 pub struct EntryChunk<'chunk, 'entry> {
     entry: &'chunk mut Entry<'entry>,
@@ -510,6 +519,7 @@ impl<'chunk, 'entry> EntryChunk<'chunk, 'entry> {
         Ok(data)
     }
 
+    /// Advances past the end of this chunk without reading the remaining bytes.
     pub fn skip_remaining_bytes(&mut self) -> io::Result<()> {
         if self.bytes_remaining > 0 {
             self.entry
@@ -540,12 +550,13 @@ impl<'chunk, 'entry> Read for EntryChunk<'chunk, 'entry> {
 
 impl<'chunk, 'entry> Drop for EntryChunk<'chunk, 'entry> {
     fn drop(&mut self) {
-        self.skip_remaining_bytes().unwrap()
+        self.skip_remaining_bytes()
+            .expect("error while skipping remaining bytes");
     }
 }
 
-/// Information about an individual segment of a [`WriteAheadLog`] that is being
-/// recovered.
+/// Information about an individual segment of a
+/// [`WriteAheadLog`](crate::WriteAheadLog) that is being recovered.
 #[derive(Debug)]
 pub struct RecoveredSegment {
     /// The value of [`Configuration::version_info`] at the time this segment

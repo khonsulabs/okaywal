@@ -1,8 +1,9 @@
-use crate::to_io_result::ToIoResult;
 use std::{
     fs,
     io::{self, Seek, SeekFrom, Write},
 };
+
+use crate::to_io_result::ToIoResult;
 
 #[derive(Debug)]
 pub struct Buffered<F>
