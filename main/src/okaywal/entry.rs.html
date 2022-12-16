@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/entry.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>entry.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../okaywal/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a><h2 class="location"></h2></nav><nav class="sidebar"><a class="sidebar-logo" href="../../okaywal/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../okaywal/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/entry.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>entry.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../okaywal/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -147,154 +147,154 @@
 <span id="147">147</span>
 <span id="148">148</span>
 <span id="149">149</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">std::io</span>::{<span class="self">self</span>, <span class="ident">Write</span>};
+</pre><pre class="rust"><code><span class="kw">use </span>std::io::{<span class="self">self</span>, Write};
 
-<span class="kw">use</span> <span class="kw">crate</span>::{
-    <span class="ident">log_file</span>::{<span class="ident">LogFile</span>, <span class="ident">LogFileWriter</span>},
-    <span class="ident">to_io_result::ToIoResult</span>,
-    <span class="ident">WriteAheadLog</span>, <span class="ident">WriteResult</span>,
+<span class="kw">use crate</span>::{
+    log_file::{LogFile, LogFileWriter},
+    to_io_result::ToIoResult,
+    WriteAheadLog, WriteResult,
 };
 
-<span class="doccomment">/// A writer for an entry in a [`WriteAheadLog`].</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Only one writer can be active for a given [`WriteAheadLog`] at any given</span>
-<span class="doccomment">/// time. See [`WriteAheadLog::begin_entry()`] for more information.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">EntryWriter</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
-    <span class="ident">id</span>: <span class="ident">EntryId</span>,
-    <span class="ident">log</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">WriteAheadLog</span>,
-    <span class="ident">file</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">LogFile</span><span class="op">&gt;</span>,
-    <span class="ident">original_length</span>: <span class="ident">u64</span>,
+<span class="doccomment">/// A writer for an entry in a [`WriteAheadLog`].
+///
+/// Only one writer can be active for a given [`WriteAheadLog`] at any given
+/// time. See [`WriteAheadLog::begin_entry()`] for more information.
+</span><span class="attribute">#[derive(Debug)]
+</span><span class="kw">pub struct </span>EntryWriter&lt;<span class="lifetime">&#39;a</span>&gt; {
+    id: EntryId,
+    log: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>WriteAheadLog,
+    file: <span class="prelude-ty">Option</span>&lt;LogFile&gt;,
+    original_length: u64,
 }
 
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">NEW_ENTRY</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">1</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">CHUNK</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">2</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">END_OF_ENTRY</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">3</span>;
+<span class="kw">pub const </span>NEW_ENTRY: u8 = <span class="number">1</span>;
+<span class="kw">pub const </span>CHUNK: u8 = <span class="number">2</span>;
+<span class="kw">pub const </span>END_OF_ENTRY: u8 = <span class="number">3</span>;
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">EntryWriter</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">log</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">WriteAheadLog</span>, <span class="ident">id</span>: <span class="ident">EntryId</span>, <span class="ident">file</span>: <span class="ident">LogFile</span>) -&gt; <span class="ident">io::Result</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">writer</span> <span class="op">=</span> <span class="ident">file</span>.<span class="ident">lock</span>();
-        <span class="kw">let</span> <span class="ident">original_length</span> <span class="op">=</span> <span class="ident">writer</span>.<span class="ident">position</span>();
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; EntryWriter&lt;<span class="lifetime">&#39;a</span>&gt; {
+    <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn </span>new(log: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>WriteAheadLog, id: EntryId, file: LogFile) -&gt; io::Result&lt;<span class="self">Self</span>&gt; {
+        <span class="kw">let </span><span class="kw-2">mut </span>writer = file.lock();
+        <span class="kw">let </span>original_length = writer.position();
 
-        <span class="ident">writer</span>.<span class="ident">write_all</span>(<span class="kw-2">&amp;</span>[<span class="ident">NEW_ENTRY</span>])<span class="question-mark">?</span>;
-        <span class="ident">writer</span>.<span class="ident">write_all</span>(<span class="kw-2">&amp;</span><span class="ident">id</span>.<span class="number">0</span>.<span class="ident">to_le_bytes</span>())<span class="question-mark">?</span>;
-        <span class="ident">drop</span>(<span class="ident">writer</span>);
+        writer.write_all(<span class="kw-2">&amp;</span>[NEW_ENTRY])<span class="question-mark">?</span>;
+        writer.write_all(<span class="kw-2">&amp;</span>id.<span class="number">0</span>.to_le_bytes())<span class="question-mark">?</span>;
+        drop(writer);
 
-        <span class="prelude-val">Ok</span>(<span class="self">Self</span> {
-            <span class="ident">id</span>,
-            <span class="ident">log</span>,
-            <span class="ident">file</span>: <span class="prelude-val">Some</span>(<span class="ident">file</span>),
-            <span class="ident">original_length</span>,
+        <span class="prelude-val">Ok</span>(<span class="self">Self </span>{
+            id,
+            log,
+            file: <span class="prelude-val">Some</span>(file),
+            original_length,
         })
     }
 
-    <span class="doccomment">/// Returns the unique id of the log entry being written.</span>
-    <span class="attribute">#[<span class="ident">must_use</span>]</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">id</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">EntryId</span> {
-        <span class="self">self</span>.<span class="ident">id</span>
+    <span class="doccomment">/// Returns the unique id of the log entry being written.
+    </span><span class="attribute">#[must_use]
+    </span><span class="kw">pub const fn </span>id(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; EntryId {
+        <span class="self">self</span>.id
     }
 
-    <span class="doccomment">/// Commits this entry to the log. Once this call returns, all data is</span>
-    <span class="doccomment">/// atomically updated and synchronized to disk.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// While the entry is being committed, other writers will be allowed to</span>
-    <span class="doccomment">/// write to the log. See [`WriteAheadLog::begin_entry()`] for more</span>
-    <span class="doccomment">/// information.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">commit</span>(<span class="self">self</span>) -&gt; <span class="ident">io::Result</span><span class="op">&lt;</span><span class="ident">EntryId</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">commit_and</span>(<span class="op">|</span><span class="ident">_file</span><span class="op">|</span> <span class="prelude-val">Ok</span>(()))
+    <span class="doccomment">/// Commits this entry to the log. Once this call returns, all data is
+    /// atomically updated and synchronized to disk.
+    ///
+    /// While the entry is being committed, other writers will be allowed to
+    /// write to the log. See [`WriteAheadLog::begin_entry()`] for more
+    /// information.
+    </span><span class="kw">pub fn </span>commit(<span class="self">self</span>) -&gt; io::Result&lt;EntryId&gt; {
+        <span class="self">self</span>.commit_and(|_file| <span class="prelude-val">Ok</span>(()))
     }
 
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">commit_and</span><span class="op">&lt;</span><span class="ident">F</span>: <span class="ident">FnOnce</span>(<span class="kw-2">&amp;mut</span> <span class="ident">LogFileWriter</span>) -&gt; <span class="ident">io::Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span><span class="op">&gt;</span>(
-        <span class="kw-2">mut</span> <span class="self">self</span>,
-        <span class="ident">callback</span>: <span class="ident">F</span>,
-    ) -&gt; <span class="ident">io::Result</span><span class="op">&lt;</span><span class="ident">EntryId</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">file</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">file</span>.<span class="ident">take</span>().<span class="ident">expect</span>(<span class="string">&quot;already committed&quot;</span>);
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>commit_and&lt;F: FnOnce(<span class="kw-2">&amp;mut </span>LogFileWriter) -&gt; io::Result&lt;()&gt;&gt;(
+        <span class="kw-2">mut </span><span class="self">self</span>,
+        callback: F,
+    ) -&gt; io::Result&lt;EntryId&gt; {
+        <span class="kw">let </span>file = <span class="self">self</span>.file.take().expect(<span class="string">&quot;already committed&quot;</span>);
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">writer</span> <span class="op">=</span> <span class="ident">file</span>.<span class="ident">lock</span>();
+        <span class="kw">let </span><span class="kw-2">mut </span>writer = file.lock();
 
-        <span class="ident">writer</span>.<span class="ident">write_all</span>(<span class="kw-2">&amp;</span>[<span class="ident">END_OF_ENTRY</span>])<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">new_length</span> <span class="op">=</span> <span class="ident">writer</span>.<span class="ident">position</span>();
-        <span class="ident">callback</span>(<span class="kw-2">&amp;mut</span> <span class="ident">writer</span>)<span class="question-mark">?</span>;
-        <span class="ident">writer</span>.<span class="ident">set_last_entry_id</span>(<span class="prelude-val">Some</span>(<span class="self">self</span>.<span class="ident">id</span>));
-        <span class="ident">drop</span>(<span class="ident">writer</span>);
+        writer.write_all(<span class="kw-2">&amp;</span>[END_OF_ENTRY])<span class="question-mark">?</span>;
+        <span class="kw">let </span>new_length = writer.position();
+        callback(<span class="kw-2">&amp;mut </span>writer)<span class="question-mark">?</span>;
+        writer.set_last_entry_id(<span class="prelude-val">Some</span>(<span class="self">self</span>.id));
+        drop(writer);
 
-        <span class="self">self</span>.<span class="ident">log</span>.<span class="ident">reclaim</span>(<span class="ident">file</span>, <span class="ident">WriteResult::Entry</span> { <span class="ident">new_length</span> })<span class="question-mark">?</span>;
+        <span class="self">self</span>.log.reclaim(file, WriteResult::Entry { new_length })<span class="question-mark">?</span>;
 
-        <span class="prelude-val">Ok</span>(<span class="self">self</span>.<span class="ident">id</span>)
+        <span class="prelude-val">Ok</span>(<span class="self">self</span>.id)
     }
 
-    <span class="doccomment">/// Abandons this entry, preventing the entry from being recovered in the</span>
-    <span class="doccomment">/// future. This is automatically done when dropped, but errors that occur</span>
-    <span class="doccomment">/// during drop will panic.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">rollback</span>(<span class="kw-2">mut</span> <span class="self">self</span>) -&gt; <span class="ident">io::Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">rollback_session</span>()
+    <span class="doccomment">/// Abandons this entry, preventing the entry from being recovered in the
+    /// future. This is automatically done when dropped, but errors that occur
+    /// during drop will panic.
+    </span><span class="kw">pub fn </span>rollback(<span class="kw-2">mut </span><span class="self">self</span>) -&gt; io::Result&lt;()&gt; {
+        <span class="self">self</span>.rollback_session()
     }
 
-    <span class="kw">fn</span> <span class="ident">rollback_session</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="ident">io::Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">file</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">file</span>.<span class="ident">take</span>().<span class="ident">expect</span>(<span class="string">&quot;file already dropped&quot;</span>);
+    <span class="kw">fn </span>rollback_session(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; io::Result&lt;()&gt; {
+        <span class="kw">let </span>file = <span class="self">self</span>.file.take().expect(<span class="string">&quot;file already dropped&quot;</span>);
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">writer</span> <span class="op">=</span> <span class="ident">file</span>.<span class="ident">lock</span>();
-        <span class="ident">writer</span>.<span class="ident">revert_to</span>(<span class="self">self</span>.<span class="ident">original_length</span>)<span class="question-mark">?</span>;
-        <span class="ident">drop</span>(<span class="ident">writer</span>);
+        <span class="kw">let </span><span class="kw-2">mut </span>writer = file.lock();
+        writer.revert_to(<span class="self">self</span>.original_length)<span class="question-mark">?</span>;
+        drop(writer);
 
-        <span class="self">self</span>.<span class="ident">log</span>.<span class="ident">reclaim</span>(<span class="ident">file</span>, <span class="ident">WriteResult::RolledBack</span>).<span class="ident">unwrap</span>();
+        <span class="self">self</span>.log.reclaim(file, WriteResult::RolledBack).unwrap();
 
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="doccomment">/// Appends a chunk of data to this log entry. Each chunk of data is able to</span>
-    <span class="doccomment">/// be read using [`Entry::read_chunk`](crate::Entry).</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">write_chunk</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">data</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) -&gt; <span class="ident">io::Result</span><span class="op">&lt;</span><span class="ident">ChunkRecord</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">length</span> <span class="op">=</span> <span class="ident">u32::try_from</span>(<span class="ident">data</span>.<span class="ident">len</span>()).<span class="ident">to_io</span>()<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">file</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">file</span>.<span class="ident">as_ref</span>().<span class="ident">expect</span>(<span class="string">&quot;already dropped&quot;</span>).<span class="ident">lock</span>();
-        <span class="kw">let</span> <span class="ident">position</span> <span class="op">=</span> <span class="ident">LogPosition</span> {
-            <span class="ident">file_id</span>: <span class="ident">file</span>.<span class="ident">id</span>(),
-            <span class="ident">offset</span>: <span class="ident">file</span>.<span class="ident">position</span>(),
+    <span class="doccomment">/// Appends a chunk of data to this log entry. Each chunk of data is able to
+    /// be read using [`Entry::read_chunk`](crate::Entry).
+    </span><span class="kw">pub fn </span>write_chunk(<span class="kw-2">&amp;mut </span><span class="self">self</span>, data: <span class="kw-2">&amp;</span>[u8]) -&gt; io::Result&lt;ChunkRecord&gt; {
+        <span class="kw">let </span>length = u32::try_from(data.len()).to_io()<span class="question-mark">?</span>;
+        <span class="kw">let </span><span class="kw-2">mut </span>file = <span class="self">self</span>.file.as_ref().expect(<span class="string">&quot;already dropped&quot;</span>).lock();
+        <span class="kw">let </span>position = LogPosition {
+            file_id: file.id(),
+            offset: file.position(),
         };
-        <span class="kw">let</span> <span class="ident">crc</span> <span class="op">=</span> <span class="ident">crc32c::crc32c</span>(<span class="ident">data</span>);
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">header</span> <span class="op">=</span> [<span class="ident">CHUNK</span>; <span class="number">9</span>];
-        <span class="ident">header</span>[<span class="number">1</span>..<span class="number">5</span>].<span class="ident">copy_from_slice</span>(<span class="kw-2">&amp;</span><span class="ident">crc</span>.<span class="ident">to_le_bytes</span>());
-        <span class="ident">header</span>[<span class="number">5</span>..].<span class="ident">copy_from_slice</span>(<span class="kw-2">&amp;</span><span class="ident">length</span>.<span class="ident">to_le_bytes</span>());
-        <span class="ident">file</span>.<span class="ident">write_all</span>(<span class="kw-2">&amp;</span><span class="ident">header</span>)<span class="question-mark">?</span>;
-        <span class="ident">file</span>.<span class="ident">write_all</span>(<span class="ident">data</span>)<span class="question-mark">?</span>;
+        <span class="kw">let </span>crc = crc32c::crc32c(data);
+        <span class="kw">let </span><span class="kw-2">mut </span>header = [CHUNK; <span class="number">9</span>];
+        header[<span class="number">1</span>..<span class="number">5</span>].copy_from_slice(<span class="kw-2">&amp;</span>crc.to_le_bytes());
+        header[<span class="number">5</span>..].copy_from_slice(<span class="kw-2">&amp;</span>length.to_le_bytes());
+        file.write_all(<span class="kw-2">&amp;</span>header)<span class="question-mark">?</span>;
+        file.write_all(data)<span class="question-mark">?</span>;
 
-        <span class="prelude-val">Ok</span>(<span class="ident">ChunkRecord</span> {
-            <span class="ident">position</span>,
-            <span class="ident">crc</span>,
-            <span class="ident">length</span>,
+        <span class="prelude-val">Ok</span>(ChunkRecord {
+            position,
+            crc,
+            length,
         })
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">Drop</span> <span class="kw">for</span> <span class="ident">EntryWriter</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">drop</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">file</span>.<span class="ident">is_some</span>() {
-            <span class="self">self</span>.<span class="ident">rollback_session</span>().<span class="ident">unwrap</span>();
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; Drop <span class="kw">for </span>EntryWriter&lt;<span class="lifetime">&#39;a</span>&gt; {
+    <span class="kw">fn </span>drop(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="kw">if </span><span class="self">self</span>.file.is_some() {
+            <span class="self">self</span>.rollback_session().unwrap();
         }
     }
 }
 
-<span class="doccomment">/// The position of a chunk of data within a [`WriteAheadLog`].</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">Eq</span>, <span class="ident">PartialEq</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">LogPosition</span> {
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">file_id</span>: <span class="ident">u64</span>,
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">offset</span>: <span class="ident">u64</span>,
+<span class="doccomment">/// The position of a chunk of data within a [`WriteAheadLog`].
+</span><span class="attribute">#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+</span><span class="kw">pub struct </span>LogPosition {
+    <span class="kw">pub</span>(<span class="kw">crate</span>) file_id: u64,
+    <span class="kw">pub</span>(<span class="kw">crate</span>) offset: u64,
 }
 
-<span class="doccomment">/// A record of a chunk that was written to a [`WriteAheadLog`].</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">Eq</span>, <span class="ident">PartialEq</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ChunkRecord</span> {
-    <span class="doccomment">/// The position of the chunk.</span>
-    <span class="kw">pub</span> <span class="ident">position</span>: <span class="ident">LogPosition</span>,
-    <span class="doccomment">/// The crc calculated for the chunk.</span>
-    <span class="kw">pub</span> <span class="ident">crc</span>: <span class="ident">u32</span>,
-    <span class="doccomment">/// The length of the data contained inside of the chunk.</span>
-    <span class="kw">pub</span> <span class="ident">length</span>: <span class="ident">u32</span>,
+<span class="doccomment">/// A record of a chunk that was written to a [`WriteAheadLog`].
+</span><span class="attribute">#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+</span><span class="kw">pub struct </span>ChunkRecord {
+    <span class="doccomment">/// The position of the chunk.
+    </span><span class="kw">pub </span>position: LogPosition,
+    <span class="doccomment">/// The crc calculated for the chunk.
+    </span><span class="kw">pub </span>crc: u32,
+    <span class="doccomment">/// The length of the data contained inside of the chunk.
+    </span><span class="kw">pub </span>length: u32,
 }
 
-<span class="doccomment">/// The unique id of an entry written to a [`WriteAheadLog`]. These IDs are</span>
-<span class="doccomment">/// ordered by the time the [`EntryWriter`] was created for the entry written with this id.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Eq</span>, <span class="ident">PartialEq</span>, <span class="ident">Ord</span>, <span class="ident">PartialOrd</span>, <span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">Default</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">EntryId</span>(<span class="kw">pub</span> <span class="ident">u64</span>);
+<span class="doccomment">/// The unique id of an entry written to a [`WriteAheadLog`]. These IDs are
+/// ordered by the time the [`EntryWriter`] was created for the entry written with this id.
+</span><span class="attribute">#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Copy, Clone, Default)]
+</span><span class="kw">pub struct </span>EntryId(<span class="kw">pub </span>u64);
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="okaywal" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0 (a55dd71d5 2022-09-19)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="okaywal" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.0 (69f9c33d7 2022-12-12)" ></div></body></html>

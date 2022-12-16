@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/config.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>config.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../okaywal/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a><h2 class="location"></h2></nav><nav class="sidebar"><a class="sidebar-logo" href="../../okaywal/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../okaywal/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/config.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>config.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../okaywal/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -69,76 +69,76 @@
 <span id="69">69</span>
 <span id="70">70</span>
 <span id="71">71</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">std</span>::{
-    <span class="ident">io</span>,
-    <span class="ident">ops::Mul</span>,
-    <span class="ident">path</span>::{<span class="ident">Path</span>, <span class="ident">PathBuf</span>},
-    <span class="ident">sync::Arc</span>,
+</pre><pre class="rust"><code><span class="kw">use </span>std::{
+    io,
+    ops::Mul,
+    path::{Path, PathBuf},
+    sync::Arc,
 };
 
-<span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">LogManager</span>, <span class="ident">WriteAheadLog</span>};
+<span class="kw">use crate</span>::{LogManager, WriteAheadLog};
 
-<span class="doccomment">/// A [`WriteAheadLog`] configuration.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Configuration</span> {
-    <span class="doccomment">/// The directory to store the log files in.</span>
-    <span class="kw">pub</span> <span class="ident">directory</span>: <span class="ident">PathBuf</span>,
-    <span class="doccomment">/// The number of bytes each log file should be preallocated with. Log files</span>
-    <span class="doccomment">/// may grow to be larger than this size if needed.</span>
-    <span class="kw">pub</span> <span class="ident">preallocate_bytes</span>: <span class="ident">u32</span>,
-    <span class="doccomment">/// After this many bytes have been written to the active log file, begin a</span>
-    <span class="doccomment">/// checkpointing process. This number should be less than</span>
-    <span class="doccomment">/// `preallocate_bytes` to try to ensure the checkpointing process happens</span>
-    <span class="doccomment">/// before the preallocated space is fully exhausted. If this amount is too</span>
-    <span class="doccomment">/// close to the preallocation amount, an entry being written may need to</span>
-    <span class="doccomment">/// extend the file which is a slow operation.</span>
-    <span class="kw">pub</span> <span class="ident">checkpoint_after_bytes</span>: <span class="ident">u64</span>,
-    <span class="doccomment">/// The number of bytes to use for the in-memory buffer when reading and</span>
-    <span class="doccomment">/// writing from the log.</span>
-    <span class="kw">pub</span> <span class="ident">buffer_bytes</span>: <span class="ident">usize</span>,
-    <span class="doccomment">/// An arbitrary chunk of bytes that is stored in the log files. Limited to</span>
-    <span class="doccomment">/// 255 bytes. This can be used for any purpose, but the design inspiration</span>
-    <span class="doccomment">/// was to allow detection of what format or version of a format the data</span>
-    <span class="doccomment">/// was inside of the log without needing to parse the entries.</span>
-    <span class="kw">pub</span> <span class="ident">version_info</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+<span class="doccomment">/// A [`WriteAheadLog`] configuration.
+</span><span class="attribute">#[derive(Debug)]
+</span><span class="kw">pub struct </span>Configuration {
+    <span class="doccomment">/// The directory to store the log files in.
+    </span><span class="kw">pub </span>directory: PathBuf,
+    <span class="doccomment">/// The number of bytes each log file should be preallocated with. Log files
+    /// may grow to be larger than this size if needed.
+    </span><span class="kw">pub </span>preallocate_bytes: u32,
+    <span class="doccomment">/// After this many bytes have been written to the active log file, begin a
+    /// checkpointing process. This number should be less than
+    /// `preallocate_bytes` to try to ensure the checkpointing process happens
+    /// before the preallocated space is fully exhausted. If this amount is too
+    /// close to the preallocation amount, an entry being written may need to
+    /// extend the file which is a slow operation.
+    </span><span class="kw">pub </span>checkpoint_after_bytes: u64,
+    <span class="doccomment">/// The number of bytes to use for the in-memory buffer when reading and
+    /// writing from the log.
+    </span><span class="kw">pub </span>buffer_bytes: usize,
+    <span class="doccomment">/// An arbitrary chunk of bytes that is stored in the log files. Limited to
+    /// 255 bytes. This can be used for any purpose, but the design inspiration
+    /// was to allow detection of what format or version of a format the data
+    /// was inside of the log without needing to parse the entries.
+    </span><span class="kw">pub </span>version_info: Arc&lt;Vec&lt;u8&gt;&gt;,
 }
 
-<span class="kw">impl</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">Configuration</span> {
-    <span class="kw">fn</span> <span class="ident">default</span>() -&gt; <span class="self">Self</span> {
-        <span class="ident"><span class="self">Self</span>::default_for</span>(<span class="string">&quot;okaywal&quot;</span>)
+<span class="kw">impl </span>Default <span class="kw">for </span>Configuration {
+    <span class="kw">fn </span>default() -&gt; <span class="self">Self </span>{
+        <span class="self">Self</span>::default_for(<span class="string">&quot;okaywal&quot;</span>)
     }
 }
 
-<span class="kw">impl</span> <span class="ident">Configuration</span> {
-    <span class="doccomment">/// Returns the default configuration for a given directory.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// This currently is:</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// - `preallocate_bytes`: 1 megabyte</span>
-    <span class="doccomment">/// - `checkpoint_after_bytes`: 768 kilobytes</span>
-    <span class="doccomment">/// - `buffer_bytes`: 16 kilobytes</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">default_for</span><span class="op">&lt;</span><span class="ident">P</span>: <span class="ident">AsRef</span><span class="op">&lt;</span><span class="ident">Path</span><span class="op">&gt;</span><span class="op">&gt;</span>(<span class="ident">path</span>: <span class="ident">P</span>) -&gt; <span class="self">Self</span> {
-        <span class="self">Self</span> {
-            <span class="ident">directory</span>: <span class="ident">path</span>.<span class="ident">as_ref</span>().<span class="ident">to_path_buf</span>(),
-            <span class="ident">preallocate_bytes</span>: <span class="ident">megabytes</span>(<span class="number">1</span>),
-            <span class="ident">checkpoint_after_bytes</span>: <span class="ident">kilobytes</span>(<span class="number">768</span>),
-            <span class="ident">buffer_bytes</span>: <span class="ident">kilobytes</span>(<span class="number">16</span>),
-            <span class="ident">version_info</span>: <span class="ident">Arc::default</span>(),
+<span class="kw">impl </span>Configuration {
+    <span class="doccomment">/// Returns the default configuration for a given directory.
+    ///
+    /// This currently is:
+    ///
+    /// - `preallocate_bytes`: 1 megabyte
+    /// - `checkpoint_after_bytes`: 768 kilobytes
+    /// - `buffer_bytes`: 16 kilobytes
+    </span><span class="kw">pub fn </span>default_for&lt;P: AsRef&lt;Path&gt;&gt;(path: P) -&gt; <span class="self">Self </span>{
+        <span class="self">Self </span>{
+            directory: path.as_ref().to_path_buf(),
+            preallocate_bytes: megabytes(<span class="number">1</span>),
+            checkpoint_after_bytes: kilobytes(<span class="number">768</span>),
+            buffer_bytes: kilobytes(<span class="number">16</span>),
+            version_info: Arc::default(),
         }
     }
 
-    <span class="doccomment">/// Opens the log using the provided log manager with this configuration.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">open</span><span class="op">&lt;</span><span class="ident">Manager</span>: <span class="ident">LogManager</span><span class="op">&gt;</span>(<span class="self">self</span>, <span class="ident">manager</span>: <span class="ident">Manager</span>) -&gt; <span class="ident">io::Result</span><span class="op">&lt;</span><span class="ident">WriteAheadLog</span><span class="op">&gt;</span> {
-        <span class="ident">WriteAheadLog::open</span>(<span class="self">self</span>, <span class="ident">manager</span>)
+    <span class="doccomment">/// Opens the log using the provided log manager with this configuration.
+    </span><span class="kw">pub fn </span>open&lt;Manager: LogManager&gt;(<span class="self">self</span>, manager: Manager) -&gt; io::Result&lt;WriteAheadLog&gt; {
+        WriteAheadLog::open(<span class="self">self</span>, manager)
     }
 }
 
-<span class="kw">fn</span> <span class="ident">megabytes</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Mul</span><span class="op">&lt;</span><span class="ident">Output</span> <span class="op">=</span> <span class="ident">T</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span><span class="op">&gt;</span>(<span class="ident">megs</span>: <span class="ident">T</span>) -&gt; <span class="ident">T</span> {
-    <span class="ident">kilobytes</span>(<span class="ident">megs</span>) <span class="op">*</span> <span class="ident">T::from</span>(<span class="number">1024</span>)
+<span class="kw">fn </span>megabytes&lt;T: Mul&lt;Output = T&gt; + From&lt;u16&gt;&gt;(megs: T) -&gt; T {
+    kilobytes(megs) * T::from(<span class="number">1024</span>)
 }
 
-<span class="kw">fn</span> <span class="ident">kilobytes</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Mul</span><span class="op">&lt;</span><span class="ident">Output</span> <span class="op">=</span> <span class="ident">T</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span><span class="op">&gt;</span>(<span class="ident">bytes</span>: <span class="ident">T</span>) -&gt; <span class="ident">T</span> {
-    <span class="ident">bytes</span> <span class="op">*</span> <span class="ident">T::from</span>(<span class="number">1024</span>)
+<span class="kw">fn </span>kilobytes&lt;T: Mul&lt;Output = T&gt; + From&lt;u16&gt;&gt;(bytes: T) -&gt; T {
+    bytes * T::from(<span class="number">1024</span>)
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="okaywal" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0 (a55dd71d5 2022-09-19)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="okaywal" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.0 (69f9c33d7 2022-12-12)" ></div></body></html>

@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../okaywal/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a><h2 class="location"></h2></nav><nav class="sidebar"><a class="sidebar-logo" href="../../okaywal/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../okaywal/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../okaywal/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -416,423 +416,563 @@
 <span id="416">416</span>
 <span id="417">417</span>
 <span id="418">418</span>
-</pre><pre class="rust"><code><span class="attribute">#![<span class="ident">doc</span> <span class="op">=</span> <span class="macro">include_str!</span>(<span class="string">&quot;.crate-docs.md&quot;</span>)]</span>
-<span class="attribute">#![<span class="ident">forbid</span>(<span class="ident">unsafe_code</span>)]</span>
-<span class="attribute">#![<span class="ident">warn</span>(
-    <span class="ident">clippy::cargo</span>,
-    <span class="ident">missing_docs</span>,
-    <span class="ident">clippy::pedantic</span>,
-    <span class="ident">future_incompatible</span>,
-    <span class="ident">rust_2018_idioms</span>
-)]</span>
-<span class="attribute">#![<span class="ident">allow</span>(
-    <span class="ident">clippy::option_if_let_else</span>,
-    <span class="ident">clippy::module_name_repetitions</span>,
-    <span class="ident">clippy::missing_errors_doc</span>
-)]</span>
+<span id="419">419</span>
+<span id="420">420</span>
+<span id="421">421</span>
+<span id="422">422</span>
+<span id="423">423</span>
+<span id="424">424</span>
+<span id="425">425</span>
+<span id="426">426</span>
+<span id="427">427</span>
+<span id="428">428</span>
+<span id="429">429</span>
+<span id="430">430</span>
+<span id="431">431</span>
+<span id="432">432</span>
+<span id="433">433</span>
+<span id="434">434</span>
+<span id="435">435</span>
+<span id="436">436</span>
+<span id="437">437</span>
+<span id="438">438</span>
+<span id="439">439</span>
+<span id="440">440</span>
+<span id="441">441</span>
+<span id="442">442</span>
+<span id="443">443</span>
+<span id="444">444</span>
+<span id="445">445</span>
+<span id="446">446</span>
+<span id="447">447</span>
+<span id="448">448</span>
+<span id="449">449</span>
+<span id="450">450</span>
+<span id="451">451</span>
+<span id="452">452</span>
+<span id="453">453</span>
+<span id="454">454</span>
+<span id="455">455</span>
+<span id="456">456</span>
+<span id="457">457</span>
+<span id="458">458</span>
+<span id="459">459</span>
+<span id="460">460</span>
+<span id="461">461</span>
+<span id="462">462</span>
+<span id="463">463</span>
+<span id="464">464</span>
+<span id="465">465</span>
+<span id="466">466</span>
+<span id="467">467</span>
+<span id="468">468</span>
+<span id="469">469</span>
+<span id="470">470</span>
+<span id="471">471</span>
+<span id="472">472</span>
+<span id="473">473</span>
+<span id="474">474</span>
+<span id="475">475</span>
+<span id="476">476</span>
+<span id="477">477</span>
+<span id="478">478</span>
+<span id="479">479</span>
+<span id="480">480</span>
+<span id="481">481</span>
+<span id="482">482</span>
+<span id="483">483</span>
+<span id="484">484</span>
+<span id="485">485</span>
+<span id="486">486</span>
+<span id="487">487</span>
+<span id="488">488</span>
+</pre><pre class="rust"><code><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;.crate-docs.md&quot;</span>)]
+#![forbid(unsafe_code)]
+#![warn(
+    clippy::cargo,
+    missing_docs,
+    clippy::pedantic,
+    future_incompatible,
+    rust_2018_idioms
+)]
+#![allow(
+    clippy::option_if_let_else,
+    clippy::module_name_repetitions,
+    clippy::missing_errors_doc
+)]
 
-<span class="kw">use</span> <span class="ident">std</span>::{
-    <span class="ident">collections::VecDeque</span>,
-    <span class="ident">fs</span>::{<span class="self">self</span>, <span class="ident">File</span>},
-    <span class="ident">io</span>::{<span class="self">self</span>, <span class="ident">ErrorKind</span>, <span class="ident">Seek</span>, <span class="ident">SeekFrom</span>},
-    <span class="ident">path::Path</span>,
-    <span class="ident">sync</span>::{<span class="ident">Arc</span>, <span class="ident">Weak</span>},
-    <span class="ident">thread::JoinHandle</span>,
-    <span class="ident">time::Instant</span>,
+</span><span class="kw">use </span>std::{
+    collections::VecDeque,
+    fs::{<span class="self">self</span>, File},
+    io::{<span class="self">self</span>, BufReader, ErrorKind, Read, Seek, SeekFrom},
+    path::Path,
+    sync::{Arc, Weak},
+    thread::JoinHandle,
+    time::Instant,
 };
 
-<span class="kw">use</span> <span class="ident">parking_lot</span>::{<span class="ident">Condvar</span>, <span class="ident">Mutex</span>, <span class="ident">MutexGuard</span>};
+<span class="kw">use </span>parking_lot::{Condvar, Mutex, MutexGuard};
 
-<span class="kw">pub</span> <span class="kw">use</span> <span class="kw">crate</span>::{
-    <span class="ident">config::Configuration</span>,
-    <span class="ident">entry</span>::{<span class="ident">EntryId</span>, <span class="ident">EntryWriter</span>},
-    <span class="ident">log_file</span>::{<span class="ident">Entry</span>, <span class="ident">EntryChunk</span>, <span class="ident">ReadChunkResult</span>, <span class="ident">RecoveredSegment</span>, <span class="ident">SegmentReader</span>},
-    <span class="ident">manager</span>::{<span class="ident">LogManager</span>, <span class="ident">LogVoid</span>, <span class="ident">Recovery</span>},
+<span class="kw">pub use crate</span>::{
+    config::Configuration,
+    entry::{ChunkRecord, EntryId, EntryWriter, LogPosition},
+    log_file::{Entry, EntryChunk, ReadChunkResult, RecoveredSegment, SegmentReader},
+    manager::{LogManager, LogVoid, Recovery},
 };
-<span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">entry::LogPosition</span>, <span class="ident">log_file::LogFile</span>, <span class="ident">to_io_result::ToIoResult</span>};
+<span class="kw">use crate</span>::{log_file::LogFile, to_io_result::ToIoResult};
 
-<span class="kw">mod</span> <span class="ident">buffered</span>;
-<span class="kw">mod</span> <span class="ident">config</span>;
-<span class="kw">mod</span> <span class="ident">entry</span>;
-<span class="kw">mod</span> <span class="ident">log_file</span>;
-<span class="kw">mod</span> <span class="ident">manager</span>;
-<span class="kw">mod</span> <span class="ident">to_io_result</span>;
+<span class="kw">mod </span>buffered;
+<span class="kw">mod </span>config;
+<span class="kw">mod </span>entry;
+<span class="kw">mod </span>log_file;
+<span class="kw">mod </span>manager;
+<span class="kw">mod </span>to_io_result;
 
-<span class="doccomment">/// A [Write-Ahead Log][wal] that provides atomic and durable writes.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// This type implements [`Clone`] and can be passed between multiple threads</span>
-<span class="doccomment">/// safely.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// When [`WriteAheadLog::begin_entry()`] is called, an exclusive lock to the</span>
-<span class="doccomment">/// active log segment is acquired. The lock is released when the entry is</span>
-<span class="doccomment">/// [rolled back](entry::EntryWriter::rollback) or once the entry is in queue</span>
-<span class="doccomment">/// for synchronization during</span>
-<span class="doccomment">/// [`EntryWriter::commit()`](entry::EntryWriter::commit).</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Multiple threads may be queued for synchronization at any given time. This</span>
-<span class="doccomment">/// allows good multi-threaded performance in spite of only using a single</span>
-<span class="doccomment">/// active file.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// [wal]: https://en.wikipedia.org/wiki/Write-ahead_logging</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">WriteAheadLog</span> {
-    <span class="ident">data</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Data</span><span class="op">&gt;</span>,
+<span class="doccomment">/// A [Write-Ahead Log][wal] that provides atomic and durable writes.
+///
+/// This type implements [`Clone`] and can be passed between multiple threads
+/// safely.
+///
+/// When [`WriteAheadLog::begin_entry()`] is called, an exclusive lock to the
+/// active log segment is acquired. The lock is released when the entry is
+/// [rolled back](entry::EntryWriter::rollback) or once the entry is in queue
+/// for synchronization during
+/// [`EntryWriter::commit()`](entry::EntryWriter::commit).
+///
+/// Multiple threads may be queued for synchronization at any given time. This
+/// allows good multi-threaded performance in spite of only using a single
+/// active file.
+///
+/// [wal]: https://en.wikipedia.org/wiki/Write-ahead_logging
+</span><span class="attribute">#[derive(Debug, Clone)]
+</span><span class="kw">pub struct </span>WriteAheadLog {
+    data: Arc&lt;Data&gt;,
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">struct</span> <span class="ident">Data</span> {
-    <span class="ident">files</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">Files</span><span class="op">&gt;</span>,
-    <span class="ident">manager</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">LogManager</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">active_sync</span>: <span class="ident">Condvar</span>,
-    <span class="ident">dirfsync_sync</span>: <span class="ident">Condvar</span>,
-    <span class="ident">config</span>: <span class="ident">Configuration</span>,
-    <span class="ident">checkpoint_sender</span>: <span class="ident">flume::Sender</span><span class="op">&lt;</span><span class="ident">LogFile</span><span class="op">&gt;</span>,
-    <span class="ident">checkpoint_thread</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">JoinHandle</span><span class="op">&lt;</span><span class="ident">io::Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+<span class="attribute">#[derive(Debug)]
+</span><span class="kw">struct </span>Data {
+    files: Mutex&lt;Files&gt;,
+    manager: Mutex&lt;Box&lt;<span class="kw">dyn </span>LogManager&gt;&gt;,
+    active_sync: Condvar,
+    dirfsync_sync: Condvar,
+    config: Configuration,
+    checkpoint_sender: flume::Sender&lt;LogFile&gt;,
+    checkpoint_thread: Mutex&lt;<span class="prelude-ty">Option</span>&lt;JoinHandle&lt;io::Result&lt;()&gt;&gt;&gt;&gt;,
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Default</span>)]</span>
-<span class="kw">struct</span> <span class="ident">Files</span> {
-    <span class="ident">active</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">LogFile</span><span class="op">&gt;</span>,
-    <span class="ident">inactive</span>: <span class="ident">VecDeque</span><span class="op">&lt;</span><span class="ident">LogFile</span><span class="op">&gt;</span>,
-    <span class="ident">last_entry_id</span>: <span class="ident">EntryId</span>,
-    <span class="ident">directory_synced_at</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Instant</span><span class="op">&gt;</span>,
-    <span class="ident">directory_is_syncing</span>: <span class="ident">bool</span>,
+<span class="attribute">#[derive(Debug, Default)]
+</span><span class="kw">struct </span>Files {
+    active: <span class="prelude-ty">Option</span>&lt;LogFile&gt;,
+    inactive: VecDeque&lt;LogFile&gt;,
+    last_entry_id: EntryId,
+    directory_synced_at: <span class="prelude-ty">Option</span>&lt;Instant&gt;,
+    directory_is_syncing: bool,
 }
 
-<span class="kw">impl</span> <span class="ident">WriteAheadLog</span> {
-    <span class="doccomment">/// Creates or opens a log in `directory` using the provided log manager to</span>
-    <span class="doccomment">/// drive recovery and checkpointing.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">recover</span><span class="op">&lt;</span><span class="ident">AsRefPath</span>: <span class="ident">AsRef</span><span class="op">&lt;</span><span class="ident">Path</span><span class="op">&gt;</span>, <span class="ident">Manager</span>: <span class="ident">LogManager</span><span class="op">&gt;</span>(
-        <span class="ident">directory</span>: <span class="ident">AsRefPath</span>,
-        <span class="ident">manager</span>: <span class="ident">Manager</span>,
-    ) -&gt; <span class="ident">io::Result</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
-        <span class="ident">Configuration::default_for</span>(<span class="ident">directory</span>).<span class="ident">open</span>(<span class="ident">manager</span>)
+<span class="kw">impl </span>WriteAheadLog {
+    <span class="doccomment">/// Creates or opens a log in `directory` using the provided log manager to
+    /// drive recovery and checkpointing.
+    </span><span class="kw">pub fn </span>recover&lt;AsRefPath: AsRef&lt;Path&gt;, Manager: LogManager&gt;(
+        directory: AsRefPath,
+        manager: Manager,
+    ) -&gt; io::Result&lt;<span class="self">Self</span>&gt; {
+        Configuration::default_for(directory).open(manager)
     }
 
-    <span class="kw">fn</span> <span class="ident">open</span><span class="op">&lt;</span><span class="ident">Manager</span>: <span class="ident">LogManager</span><span class="op">&gt;</span>(<span class="ident">config</span>: <span class="ident">Configuration</span>, <span class="kw-2">mut</span> <span class="ident">manager</span>: <span class="ident">Manager</span>) -&gt; <span class="ident">io::Result</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="op">!</span><span class="ident">config</span>.<span class="ident">directory</span>.<span class="ident">exists</span>() {
-            <span class="ident">std::fs::create_dir_all</span>(<span class="kw-2">&amp;</span><span class="ident">config</span>.<span class="ident">directory</span>)<span class="question-mark">?</span>;
+    <span class="kw">fn </span>open&lt;Manager: LogManager&gt;(config: Configuration, <span class="kw-2">mut </span>manager: Manager) -&gt; io::Result&lt;<span class="self">Self</span>&gt; {
+        <span class="kw">if </span>!config.directory.exists() {
+            std::fs::create_dir_all(<span class="kw-2">&amp;</span>config.directory)<span class="question-mark">?</span>;
         }
-        <span class="comment">// Find all files that match this pattern: &quot;wal-[0-9]+(-cp)?&quot;</span>
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">discovered_files</span> <span class="op">=</span> <span class="ident">Vec::new</span>();
-        <span class="kw">for</span> <span class="ident">file</span> <span class="kw">in</span> <span class="ident">fs::read_dir</span>(<span class="kw-2">&amp;</span><span class="ident">config</span>.<span class="ident">directory</span>)<span class="question-mark">?</span>.<span class="ident">filter_map</span>(<span class="ident">Result::ok</span>) {
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">file_name</span>) <span class="op">=</span> <span class="ident">file</span>.<span class="ident">file_name</span>().<span class="ident">to_str</span>() {
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">parts</span> <span class="op">=</span> <span class="ident">file_name</span>.<span class="ident">split</span>(<span class="string">&#39;-&#39;</span>);
-                <span class="kw">let</span> <span class="ident">prefix</span> <span class="op">=</span> <span class="ident">parts</span>.<span class="ident">next</span>();
-                <span class="kw">let</span> <span class="ident">entry_id</span> <span class="op">=</span> <span class="ident">parts</span>.<span class="ident">next</span>().<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">ts</span><span class="op">|</span> <span class="ident">ts</span>.<span class="ident">parse</span>::<span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span>().<span class="ident">ok</span>());
-                <span class="kw">let</span> <span class="ident">suffix</span> <span class="op">=</span> <span class="ident">parts</span>.<span class="ident">next</span>();
-                <span class="kw">match</span> (<span class="ident">prefix</span>, <span class="ident">entry_id</span>, <span class="ident">suffix</span>) {
-                    (<span class="prelude-val">Some</span>(<span class="ident">prefix</span>), <span class="prelude-val">Some</span>(<span class="ident">entry_id</span>), <span class="ident">suffix</span>) <span class="kw">if</span> <span class="ident">prefix</span> <span class="op">==</span> <span class="string">&quot;wal&quot;</span> =&gt; {
-                        <span class="kw">let</span> <span class="ident">has_checkpointed</span> <span class="op">=</span> <span class="ident">suffix</span> <span class="op">==</span> <span class="prelude-val">Some</span>(<span class="string">&quot;cp&quot;</span>);
-                        <span class="ident">discovered_files</span>.<span class="ident">push</span>((<span class="ident">entry_id</span>, <span class="ident">file</span>.<span class="ident">path</span>(), <span class="ident">has_checkpointed</span>));
+        <span class="comment">// Find all files that match this pattern: &quot;wal-[0-9]+(-cp)?&quot;
+        </span><span class="kw">let </span><span class="kw-2">mut </span>discovered_files = Vec::new();
+        <span class="kw">for </span>file <span class="kw">in </span>fs::read_dir(<span class="kw-2">&amp;</span>config.directory)<span class="question-mark">?</span>.filter_map(Result::ok) {
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(file_name) = file.file_name().to_str() {
+                <span class="kw">let </span><span class="kw-2">mut </span>parts = file_name.split(<span class="string">&#39;-&#39;</span>);
+                <span class="kw">let </span>prefix = parts.next();
+                <span class="kw">let </span>entry_id = parts.next().and_then(|ts| ts.parse::&lt;u64&gt;().ok());
+                <span class="kw">let </span>suffix = parts.next();
+                <span class="kw">match </span>(prefix, entry_id, suffix) {
+                    (<span class="prelude-val">Some</span>(prefix), <span class="prelude-val">Some</span>(entry_id), suffix) <span class="kw">if </span>prefix == <span class="string">&quot;wal&quot; </span>=&gt; {
+                        <span class="kw">let </span>has_checkpointed = suffix == <span class="prelude-val">Some</span>(<span class="string">&quot;cp&quot;</span>);
+                        discovered_files.push((entry_id, file.path(), has_checkpointed));
                     }
-                    <span class="kw">_</span> =&gt; {}
+                    <span class="kw">_ </span>=&gt; {}
                 }
             }
         }
 
-        <span class="comment">// Sort by the timestamp</span>
-        <span class="ident">discovered_files</span>.<span class="ident">sort_by</span>(<span class="op">|</span><span class="ident">a</span>, <span class="ident">b</span><span class="op">|</span> <span class="ident">a</span>.<span class="number">0</span>.<span class="ident">cmp</span>(<span class="kw-2">&amp;</span><span class="ident">b</span>.<span class="number">0</span>));
+        <span class="comment">// Sort by the timestamp
+        </span>discovered_files.sort_by(|a, b| a.<span class="number">0</span>.cmp(<span class="kw-2">&amp;</span>b.<span class="number">0</span>));
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">files</span> <span class="op">=</span> <span class="ident">Files::default</span>();
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">files_to_checkpoint</span> <span class="op">=</span> <span class="ident">Vec::new</span>();
-        <span class="kw">for</span> (<span class="ident">entry_id</span>, <span class="ident">path</span>, <span class="ident">has_checkpointed</span>) <span class="kw">in</span> <span class="ident">discovered_files</span> {
-            <span class="kw">if</span> <span class="ident">has_checkpointed</span> {
-                <span class="ident">files</span>
-                    .<span class="ident">inactive</span>
-                    .<span class="ident">push_back</span>(<span class="ident">LogFile::write</span>(<span class="ident">entry_id</span>, <span class="ident">path</span>, <span class="number">0</span>, <span class="prelude-val">None</span>, <span class="kw-2">&amp;</span><span class="ident">config</span>)<span class="question-mark">?</span>);
-            } <span class="kw">else</span> {
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">reader</span> <span class="op">=</span> <span class="ident">SegmentReader::new</span>(<span class="kw-2">&amp;</span><span class="ident">path</span>)<span class="question-mark">?</span>;
-                <span class="kw">match</span> <span class="ident">manager</span>.<span class="ident">should_recover_segment</span>(<span class="kw-2">&amp;</span><span class="ident">reader</span>.<span class="ident">header</span>)<span class="question-mark">?</span> {
-                    <span class="ident">Recovery::Recover</span> =&gt; {
-                        <span class="kw">while</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="kw-2">mut</span> <span class="ident">entry</span>) <span class="op">=</span> <span class="ident">reader</span>.<span class="ident">read_entry</span>()<span class="question-mark">?</span> {
-                            <span class="ident">manager</span>.<span class="ident">recover</span>(<span class="kw-2">&amp;mut</span> <span class="ident">entry</span>)<span class="question-mark">?</span>;
-                            <span class="kw">while</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="kw-2">mut</span> <span class="ident">chunk</span>) <span class="op">=</span> <span class="kw">match</span> <span class="ident">entry</span>.<span class="ident">read_chunk</span>()<span class="question-mark">?</span> {
-                                <span class="ident">ReadChunkResult::Chunk</span>(<span class="ident">chunk</span>) =&gt; <span class="prelude-val">Some</span>(<span class="ident">chunk</span>),
-                                <span class="ident">ReadChunkResult::EndOfEntry</span> <span class="op">|</span> <span class="ident">ReadChunkResult::AbortedEntry</span> =&gt; <span class="prelude-val">None</span>,
+        <span class="kw">let </span><span class="kw-2">mut </span>files = Files::default();
+        <span class="kw">let </span><span class="kw-2">mut </span>files_to_checkpoint = Vec::new();
+        <span class="kw">for </span>(entry_id, path, has_checkpointed) <span class="kw">in </span>discovered_files {
+            <span class="kw">if </span>has_checkpointed {
+                files
+                    .inactive
+                    .push_back(LogFile::write(entry_id, path, <span class="number">0</span>, <span class="prelude-val">None</span>, <span class="kw-2">&amp;</span>config)<span class="question-mark">?</span>);
+            } <span class="kw">else </span>{
+                <span class="kw">let </span><span class="kw-2">mut </span>reader = SegmentReader::new(<span class="kw-2">&amp;</span>path, entry_id)<span class="question-mark">?</span>;
+                <span class="kw">match </span>manager.should_recover_segment(<span class="kw-2">&amp;</span>reader.header)<span class="question-mark">? </span>{
+                    Recovery::Recover =&gt; {
+                        <span class="kw">while let </span><span class="prelude-val">Some</span>(<span class="kw-2">mut </span>entry) = reader.read_entry()<span class="question-mark">? </span>{
+                            manager.recover(<span class="kw-2">&amp;mut </span>entry)<span class="question-mark">?</span>;
+                            <span class="kw">while let </span><span class="prelude-val">Some</span>(<span class="kw-2">mut </span>chunk) = <span class="kw">match </span>entry.read_chunk()<span class="question-mark">? </span>{
+                                ReadChunkResult::Chunk(chunk) =&gt; <span class="prelude-val">Some</span>(chunk),
+                                ReadChunkResult::EndOfEntry | ReadChunkResult::AbortedEntry =&gt; <span class="prelude-val">None</span>,
                             } {
-                                <span class="ident">chunk</span>.<span class="ident">skip_remaining_bytes</span>()<span class="question-mark">?</span>;
+                                chunk.skip_remaining_bytes()<span class="question-mark">?</span>;
                             }
-                            <span class="ident">files</span>.<span class="ident">last_entry_id</span> <span class="op">=</span> <span class="ident">entry</span>.<span class="ident">id</span>();
+                            files.last_entry_id = entry.id();
                         }
 
-                        <span class="ident">files_to_checkpoint</span>.<span class="ident">push</span>(<span class="ident">LogFile::write</span>(
-                            <span class="ident">entry_id</span>,
-                            <span class="ident">path</span>,
-                            <span class="ident">reader</span>.<span class="ident">valid_until</span>,
-                            <span class="ident">reader</span>.<span class="ident">last_entry_id</span>,
-                            <span class="kw-2">&amp;</span><span class="ident">config</span>,
+                        files_to_checkpoint.push(LogFile::write(
+                            entry_id,
+                            path,
+                            reader.valid_until,
+                            reader.last_entry_id,
+                            <span class="kw-2">&amp;</span>config,
                         )<span class="question-mark">?</span>);
                     }
-                    <span class="ident">Recovery::Abandon</span> =&gt; <span class="ident">files</span>
-                        .<span class="ident">inactive</span>
-                        .<span class="ident">push_back</span>(<span class="ident">LogFile::write</span>(<span class="ident">entry_id</span>, <span class="ident">path</span>, <span class="number">0</span>, <span class="prelude-val">None</span>, <span class="kw-2">&amp;</span><span class="ident">config</span>)<span class="question-mark">?</span>),
+                    Recovery::Abandon =&gt; files
+                        .inactive
+                        .push_back(LogFile::write(entry_id, path, <span class="number">0</span>, <span class="prelude-val">None</span>, <span class="kw-2">&amp;</span>config)<span class="question-mark">?</span>),
                 }
             }
         }
 
-        <span class="comment">// If we recovered a file that wasn&#39;t checkpointed, activate it.</span>
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">latest_file</span>) <span class="op">=</span> <span class="ident">files_to_checkpoint</span>.<span class="ident">pop</span>() {
-            <span class="ident">files</span>.<span class="ident">active</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">latest_file</span>);
-        } <span class="kw">else</span> {
-            <span class="ident">files</span>.<span class="ident">activate_new_file</span>(<span class="kw-2">&amp;</span><span class="ident">config</span>)<span class="question-mark">?</span>;
+        <span class="comment">// If we recovered a file that wasn&#39;t checkpointed, activate it.
+        </span><span class="kw">if let </span><span class="prelude-val">Some</span>(latest_file) = files_to_checkpoint.pop() {
+            files.active = <span class="prelude-val">Some</span>(latest_file);
+        } <span class="kw">else </span>{
+            files.activate_new_file(<span class="kw-2">&amp;</span>config)<span class="question-mark">?</span>;
         }
 
-        <span class="kw">let</span> (<span class="ident">checkpoint_sender</span>, <span class="ident">checkpoint_receiver</span>) <span class="op">=</span> <span class="ident">flume::unbounded</span>();
-        <span class="kw">let</span> <span class="ident">wal</span> <span class="op">=</span> <span class="self">Self</span> {
-            <span class="ident">data</span>: <span class="ident">Arc::new</span>(<span class="ident">Data</span> {
-                <span class="ident">files</span>: <span class="ident">Mutex::new</span>(<span class="ident">files</span>),
-                <span class="ident">manager</span>: <span class="ident">Mutex::new</span>(<span class="ident">Box::new</span>(<span class="ident">manager</span>)),
-                <span class="ident">active_sync</span>: <span class="ident">Condvar::new</span>(),
-                <span class="ident">dirfsync_sync</span>: <span class="ident">Condvar::new</span>(),
-                <span class="ident">config</span>,
-                <span class="ident">checkpoint_sender</span>,
-                <span class="ident">checkpoint_thread</span>: <span class="ident">Mutex::new</span>(<span class="prelude-val">None</span>),
+        <span class="kw">let </span>(checkpoint_sender, checkpoint_receiver) = flume::unbounded();
+        <span class="kw">let </span>wal = <span class="self">Self </span>{
+            data: Arc::new(Data {
+                files: Mutex::new(files),
+                manager: Mutex::new(Box::new(manager)),
+                active_sync: Condvar::new(),
+                dirfsync_sync: Condvar::new(),
+                config,
+                checkpoint_sender,
+                checkpoint_thread: Mutex::new(<span class="prelude-val">None</span>),
             }),
         };
 
-        <span class="kw">for</span> <span class="ident">file_to_checkpoint</span> <span class="kw">in</span> <span class="ident">files_to_checkpoint</span>.<span class="ident">into_iter</span>().<span class="ident">rev</span>() {
-            <span class="ident">wal</span>.<span class="ident">data</span>
-                .<span class="ident">checkpoint_sender</span>
-                .<span class="ident">send</span>(<span class="ident">file_to_checkpoint</span>)
-                .<span class="ident">to_io</span>()<span class="question-mark">?</span>;
+        <span class="kw">for </span>file_to_checkpoint <span class="kw">in </span>files_to_checkpoint.into_iter().rev() {
+            wal.data
+                .checkpoint_sender
+                .send(file_to_checkpoint)
+                .to_io()<span class="question-mark">?</span>;
         }
 
-        <span class="kw">let</span> <span class="ident">weak_wal</span> <span class="op">=</span> <span class="ident">Arc::downgrade</span>(<span class="kw-2">&amp;</span><span class="ident">wal</span>.<span class="ident">data</span>);
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">checkpoint_thread</span> <span class="op">=</span> <span class="ident">wal</span>.<span class="ident">data</span>.<span class="ident">checkpoint_thread</span>.<span class="ident">lock</span>();
-        <span class="kw-2">*</span><span class="ident">checkpoint_thread</span> <span class="op">=</span> <span class="prelude-val">Some</span>(
-            <span class="ident">std::thread::Builder::new</span>()
-                .<span class="ident">name</span>(<span class="ident">String::from</span>(<span class="string">&quot;okaywal-cp&quot;</span>))
-                .<span class="ident">spawn</span>(<span class="kw">move</span> <span class="op">|</span><span class="op">|</span> <span class="ident"><span class="self">Self</span>::checkpoint_thread</span>(<span class="kw-2">&amp;</span><span class="ident">weak_wal</span>, <span class="kw-2">&amp;</span><span class="ident">checkpoint_receiver</span>))
-                .<span class="ident">expect</span>(<span class="string">&quot;failed to spawn checkpointer thread&quot;</span>),
+        <span class="kw">let </span>weak_wal = Arc::downgrade(<span class="kw-2">&amp;</span>wal.data);
+        <span class="kw">let </span><span class="kw-2">mut </span>checkpoint_thread = wal.data.checkpoint_thread.lock();
+        <span class="kw-2">*</span>checkpoint_thread = <span class="prelude-val">Some</span>(
+            std::thread::Builder::new()
+                .name(String::from(<span class="string">&quot;okaywal-cp&quot;</span>))
+                .spawn(<span class="kw">move </span>|| <span class="self">Self</span>::checkpoint_thread(<span class="kw-2">&amp;</span>weak_wal, <span class="kw-2">&amp;</span>checkpoint_receiver))
+                .expect(<span class="string">&quot;failed to spawn checkpointer thread&quot;</span>),
         );
-        <span class="ident">drop</span>(<span class="ident">checkpoint_thread</span>);
+        drop(checkpoint_thread);
 
-        <span class="prelude-val">Ok</span>(<span class="ident">wal</span>)
+        <span class="prelude-val">Ok</span>(wal)
     }
 
-    <span class="doccomment">/// Begins writing an entry to this log.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// A new unique entry id will be allocated for the entry being written. If</span>
-    <span class="doccomment">/// the entry is rolled back, the entry id will not be reused. The entry id</span>
-    <span class="doccomment">/// can be retrieved through [`EntryWriter::id()`](entry::EntryWriter::id).</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// This call will acquire an exclusive lock to the active file or block</span>
-    <span class="doccomment">/// until it can be acquired.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">begin_entry</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">io::Result</span><span class="op">&lt;</span><span class="ident">EntryWriter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">files</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">data</span>.<span class="ident">files</span>.<span class="ident">lock</span>();
-        <span class="kw">let</span> <span class="ident">file</span> <span class="op">=</span> <span class="kw">loop</span> {
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">file</span>) <span class="op">=</span> <span class="ident">files</span>.<span class="ident">active</span>.<span class="ident">take</span>() {
-                <span class="kw">break</span> <span class="ident">file</span>;
+    <span class="doccomment">/// Begins writing an entry to this log.
+    ///
+    /// A new unique entry id will be allocated for the entry being written. If
+    /// the entry is rolled back, the entry id will not be reused. The entry id
+    /// can be retrieved through [`EntryWriter::id()`](entry::EntryWriter::id).
+    ///
+    /// This call will acquire an exclusive lock to the active file or block
+    /// until it can be acquired.
+    </span><span class="kw">pub fn </span>begin_entry(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; io::Result&lt;EntryWriter&lt;<span class="lifetime">&#39;_</span>&gt;&gt; {
+        <span class="kw">let </span><span class="kw-2">mut </span>files = <span class="self">self</span>.data.files.lock();
+        <span class="kw">let </span>file = <span class="kw">loop </span>{
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(file) = files.active.take() {
+                <span class="kw">break </span>file;
             }
 
-            <span class="comment">// Wait for a free file</span>
-            <span class="self">self</span>.<span class="ident">data</span>.<span class="ident">active_sync</span>.<span class="ident">wait</span>(<span class="kw-2">&amp;mut</span> <span class="ident">files</span>);
+            <span class="comment">// Wait for a free file
+            </span><span class="self">self</span>.data.active_sync.wait(<span class="kw-2">&amp;mut </span>files);
         };
-        <span class="ident">files</span>.<span class="ident">last_entry_id</span>.<span class="number">0</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
-        <span class="kw">let</span> <span class="ident">entry_id</span> <span class="op">=</span> <span class="ident">files</span>.<span class="ident">last_entry_id</span>;
-        <span class="ident">drop</span>(<span class="ident">files</span>);
+        files.last_entry_id.<span class="number">0 </span>+= <span class="number">1</span>;
+        <span class="kw">let </span>entry_id = files.last_entry_id;
+        drop(files);
 
-        <span class="ident">EntryWriter::new</span>(<span class="self">self</span>, <span class="ident">entry_id</span>, <span class="ident">file</span>)
+        EntryWriter::new(<span class="self">self</span>, entry_id, file)
     }
 
-    <span class="kw">fn</span> <span class="ident">reclaim</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">file</span>: <span class="ident">LogFile</span>, <span class="ident">result</span>: <span class="ident">WriteResult</span>) -&gt; <span class="ident">io::Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="kw">let</span> <span class="ident">WriteResult::Entry</span> { <span class="ident">new_length</span> } <span class="op">=</span> <span class="ident">result</span> {
-            <span class="kw">let</span> <span class="ident">last_directory_sync</span> <span class="op">=</span> <span class="kw">if</span> <span class="self">self</span>.<span class="ident">data</span>.<span class="ident">config</span>.<span class="ident">checkpoint_after_bytes</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">new_length</span> {
-                <span class="comment">// Checkpoint this file. This first means activating a new file.</span>
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">files</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">data</span>.<span class="ident">files</span>.<span class="ident">lock</span>();
-                <span class="ident">files</span>.<span class="ident">activate_new_file</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">data</span>.<span class="ident">config</span>)<span class="question-mark">?</span>;
-                <span class="kw">let</span> <span class="ident">last_directory_sync</span> <span class="op">=</span> <span class="ident">files</span>.<span class="ident">directory_synced_at</span>;
-                <span class="ident">drop</span>(<span class="ident">files</span>);
-                <span class="self">self</span>.<span class="ident">data</span>.<span class="ident">active_sync</span>.<span class="ident">notify_one</span>();
+    <span class="kw">fn </span>reclaim(<span class="kw-2">&amp;</span><span class="self">self</span>, file: LogFile, result: WriteResult) -&gt; io::Result&lt;()&gt; {
+        <span class="kw">if let </span>WriteResult::Entry { new_length } = result {
+            <span class="kw">let </span>last_directory_sync = <span class="kw">if </span><span class="self">self</span>.data.config.checkpoint_after_bytes &lt;= new_length {
+                <span class="comment">// Checkpoint this file. This first means activating a new file.
+                </span><span class="kw">let </span><span class="kw-2">mut </span>files = <span class="self">self</span>.data.files.lock();
+                files.activate_new_file(<span class="kw-2">&amp;</span><span class="self">self</span>.data.config)<span class="question-mark">?</span>;
+                <span class="kw">let </span>last_directory_sync = files.directory_synced_at;
+                drop(files);
+                <span class="self">self</span>.data.active_sync.notify_one();
 
-                <span class="comment">// Now, send the file to the checkpointer.</span>
-                <span class="self">self</span>.<span class="ident">data</span>.<span class="ident">checkpoint_sender</span>.<span class="ident">send</span>(<span class="ident">file</span>.<span class="ident">clone</span>()).<span class="ident">to_io</span>()<span class="question-mark">?</span>;
+                <span class="comment">// Now, send the file to the checkpointer.
+                </span><span class="self">self</span>.data.checkpoint_sender.send(file.clone()).to_io()<span class="question-mark">?</span>;
 
-                <span class="ident">last_directory_sync</span>
-            } <span class="kw">else</span> {
-                <span class="comment">// We wrote an entry, but the file isn&#39;t ready to be</span>
-                <span class="comment">// checkpointed. Return the file to allow more writes to happen</span>
-                <span class="comment">// in the meantime.</span>
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">files</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">data</span>.<span class="ident">files</span>.<span class="ident">lock</span>();
-                <span class="ident">files</span>.<span class="ident">active</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">file</span>.<span class="ident">clone</span>());
-                <span class="kw">let</span> <span class="ident">last_directory_sync</span> <span class="op">=</span> <span class="ident">files</span>.<span class="ident">directory_synced_at</span>;
-                <span class="ident">drop</span>(<span class="ident">files</span>);
-                <span class="self">self</span>.<span class="ident">data</span>.<span class="ident">active_sync</span>.<span class="ident">notify_one</span>();
-                <span class="ident">last_directory_sync</span>
+                last_directory_sync
+            } <span class="kw">else </span>{
+                <span class="comment">// We wrote an entry, but the file isn&#39;t ready to be
+                // checkpointed. Return the file to allow more writes to happen
+                // in the meantime.
+                </span><span class="kw">let </span><span class="kw-2">mut </span>files = <span class="self">self</span>.data.files.lock();
+                files.active = <span class="prelude-val">Some</span>(file.clone());
+                <span class="kw">let </span>last_directory_sync = files.directory_synced_at;
+                drop(files);
+                <span class="self">self</span>.data.active_sync.notify_one();
+                last_directory_sync
             };
 
-            <span class="comment">// Before reporting success we need to synchronize the data to</span>
-            <span class="comment">// disk. To enable as much throughput as possible, we only want</span>
-            <span class="comment">// one thread at a time to synchronize this file.</span>
-            <span class="ident">file</span>.<span class="ident">synchronize</span>(<span class="ident">new_length</span>)<span class="question-mark">?</span>;
+            <span class="comment">// Before reporting success we need to synchronize the data to
+            // disk. To enable as much throughput as possible, we only want
+            // one thread at a time to synchronize this file.
+            </span>file.synchronize(new_length)<span class="question-mark">?</span>;
 
-            <span class="comment">// If this file was activated during this process, we need to</span>
-            <span class="comment">// sync the directory to ensure the file&#39;s metadata is</span>
-            <span class="comment">// up-to-date.</span>
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">created_at</span>) <span class="op">=</span> <span class="ident">file</span>.<span class="ident">created_at</span>() {
-                <span class="comment">// We want to avoid acquiring the lock again if we don&#39;t</span>
-                <span class="comment">// need to. Verify that the file was created after the last</span>
-                <span class="comment">// directory sync.</span>
-                <span class="kw">if</span> <span class="ident">last_directory_sync</span>.<span class="ident">is_none</span>() <span class="op">|</span><span class="op">|</span> <span class="ident">last_directory_sync</span>.<span class="ident">unwrap</span>() <span class="op">&lt;</span> <span class="ident">created_at</span> {
-                    <span class="kw">let</span> <span class="ident">files</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">data</span>.<span class="ident">files</span>.<span class="ident">lock</span>();
-                    <span class="ident">drop</span>(<span class="self">self</span>.<span class="ident">sync_directory</span>(<span class="ident">files</span>, <span class="ident">created_at</span>)<span class="question-mark">?</span>);
+            <span class="comment">// If this file was activated during this process, we need to
+            // sync the directory to ensure the file&#39;s metadata is
+            // up-to-date.
+            </span><span class="kw">if let </span><span class="prelude-val">Some</span>(created_at) = file.created_at() {
+                <span class="comment">// We want to avoid acquiring the lock again if we don&#39;t
+                // need to. Verify that the file was created after the last
+                // directory sync.
+                </span><span class="kw">if </span>last_directory_sync.is_none() || last_directory_sync.unwrap() &lt; created_at {
+                    <span class="kw">let </span>files = <span class="self">self</span>.data.files.lock();
+                    drop(<span class="self">self</span>.sync_directory(files, created_at)<span class="question-mark">?</span>);
                 }
             }
-        } <span class="kw">else</span> {
-            <span class="comment">// Nothing happened, return the file back to be written.</span>
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">files</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">data</span>.<span class="ident">files</span>.<span class="ident">lock</span>();
-            <span class="ident">files</span>.<span class="ident">active</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">file</span>);
-            <span class="ident">drop</span>(<span class="ident">files</span>);
-            <span class="self">self</span>.<span class="ident">data</span>.<span class="ident">active_sync</span>.<span class="ident">notify_one</span>();
+        } <span class="kw">else </span>{
+            <span class="comment">// Nothing happened, return the file back to be written.
+            </span><span class="kw">let </span><span class="kw-2">mut </span>files = <span class="self">self</span>.data.files.lock();
+            files.active = <span class="prelude-val">Some</span>(file);
+            drop(files);
+            <span class="self">self</span>.data.active_sync.notify_one();
         }
 
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="kw">fn</span> <span class="ident">checkpoint_thread</span>(
-        <span class="ident">data</span>: <span class="kw-2">&amp;</span><span class="ident">Weak</span><span class="op">&lt;</span><span class="ident">Data</span><span class="op">&gt;</span>,
-        <span class="ident">checkpoint_receiver</span>: <span class="kw-2">&amp;</span><span class="ident">flume::Receiver</span><span class="op">&lt;</span><span class="ident">LogFile</span><span class="op">&gt;</span>,
-    ) -&gt; <span class="ident">io::Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-        <span class="kw">while</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="ident">file_to_checkpoint</span>) <span class="op">=</span> <span class="ident">checkpoint_receiver</span>.<span class="ident">recv</span>() {
-            <span class="kw">let</span> <span class="ident">wal</span> <span class="op">=</span> <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">data</span>) <span class="op">=</span> <span class="ident">data</span>.<span class="ident">upgrade</span>() {
-                <span class="ident">WriteAheadLog</span> { <span class="ident">data</span> }
-            } <span class="kw">else</span> {
+    <span class="kw">fn </span>checkpoint_thread(
+        data: <span class="kw-2">&amp;</span>Weak&lt;Data&gt;,
+        checkpoint_receiver: <span class="kw-2">&amp;</span>flume::Receiver&lt;LogFile&gt;,
+    ) -&gt; io::Result&lt;()&gt; {
+        <span class="kw">while let </span><span class="prelude-val">Ok</span>(file_to_checkpoint) = checkpoint_receiver.recv() {
+            <span class="kw">let </span>wal = <span class="kw">if let </span><span class="prelude-val">Some</span>(data) = data.upgrade() {
+                WriteAheadLog { data }
+            } <span class="kw">else </span>{
                 <span class="kw">break</span>;
             };
 
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">writer</span> <span class="op">=</span> <span class="ident">file_to_checkpoint</span>.<span class="ident">lock</span>();
-            <span class="kw">while</span> <span class="op">!</span><span class="ident">writer</span>.<span class="ident">is_synchronized</span>() {
-                <span class="kw">let</span> <span class="ident">synchronize_target</span> <span class="op">=</span> <span class="ident">writer</span>.<span class="ident">position</span>();
-                <span class="ident">writer</span> <span class="op">=</span> <span class="ident">file_to_checkpoint</span>.<span class="ident">synchronize_locked</span>(<span class="ident">writer</span>, <span class="ident">synchronize_target</span>)<span class="question-mark">?</span>;
+            <span class="kw">let </span><span class="kw-2">mut </span>writer = file_to_checkpoint.lock();
+            <span class="kw">while </span>!writer.is_synchronized() {
+                <span class="kw">let </span>synchronize_target = writer.position();
+                writer = file_to_checkpoint.synchronize_locked(writer, synchronize_target)<span class="question-mark">?</span>;
             }
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">entry_id</span>) <span class="op">=</span> <span class="ident">writer</span>.<span class="ident">last_entry_id</span>() {
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">reader</span> <span class="op">=</span> <span class="ident">SegmentReader::new</span>(<span class="ident">writer</span>.<span class="ident">path</span>())<span class="question-mark">?</span>;
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">manager</span> <span class="op">=</span> <span class="ident">wal</span>.<span class="ident">data</span>.<span class="ident">manager</span>.<span class="ident">lock</span>();
-                <span class="ident">manager</span>.<span class="ident">checkpoint_to</span>(<span class="ident">entry_id</span>, <span class="kw-2">&amp;mut</span> <span class="ident">reader</span>)<span class="question-mark">?</span>;
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(entry_id) = writer.last_entry_id() {
+                <span class="kw">let </span><span class="kw-2">mut </span>reader = SegmentReader::new(writer.path(), writer.id())<span class="question-mark">?</span>;
+                <span class="kw">let </span><span class="kw-2">mut </span>manager = wal.data.manager.lock();
+                manager.checkpoint_to(entry_id, <span class="kw-2">&amp;mut </span>reader)<span class="question-mark">?</span>;
             }
 
-            <span class="comment">// Prepare the writer to be recycled.</span>
-            <span class="kw">let</span> <span class="ident">new_name</span> <span class="op">=</span> <span class="macro">format!</span>(
+            <span class="comment">// Prepare the writer to be recycled.
+            </span><span class="kw">let </span>new_name = <span class="macro">format!</span>(
                 <span class="string">&quot;{}-cp&quot;</span>,
-                <span class="ident">writer</span>
-                    .<span class="ident">path</span>()
-                    .<span class="ident">file_name</span>()
-                    .<span class="ident">expect</span>(<span class="string">&quot;missing name&quot;</span>)
-                    .<span class="ident">to_str</span>()
-                    .<span class="ident">expect</span>(<span class="string">&quot;should be ascii&quot;</span>)
+                writer
+                    .path()
+                    .file_name()
+                    .expect(<span class="string">&quot;missing name&quot;</span>)
+                    .to_str()
+                    .expect(<span class="string">&quot;should be ascii&quot;</span>)
             );
-            <span class="ident">writer</span>.<span class="ident">revert_to</span>(<span class="number">0</span>)<span class="question-mark">?</span>;
-            <span class="ident">drop</span>(<span class="ident">writer</span>);
+            writer.revert_to(<span class="number">0</span>)<span class="question-mark">?</span>;
+            drop(writer);
 
-            <span class="ident">file_to_checkpoint</span>.<span class="ident">rename</span>(<span class="kw-2">&amp;</span><span class="ident">new_name</span>)<span class="question-mark">?</span>;
-            <span class="kw">let</span> <span class="ident">sync_target</span> <span class="op">=</span> <span class="ident">Instant::now</span>();
+            file_to_checkpoint.rename(<span class="kw-2">&amp;</span>new_name)<span class="question-mark">?</span>;
+            <span class="kw">let </span>sync_target = Instant::now();
 
-            <span class="kw">let</span> <span class="ident">files</span> <span class="op">=</span> <span class="ident">wal</span>.<span class="ident">data</span>.<span class="ident">files</span>.<span class="ident">lock</span>();
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">files</span> <span class="op">=</span> <span class="ident">wal</span>.<span class="ident">sync_directory</span>(<span class="ident">files</span>, <span class="ident">sync_target</span>)<span class="question-mark">?</span>;
-            <span class="ident">files</span>.<span class="ident">inactive</span>.<span class="ident">push_back</span>(<span class="ident">file_to_checkpoint</span>);
+            <span class="kw">let </span>files = wal.data.files.lock();
+            <span class="kw">let </span><span class="kw-2">mut </span>files = wal.sync_directory(files, sync_target)<span class="question-mark">?</span>;
+            files.inactive.push_back(file_to_checkpoint);
         }
 
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="kw">fn</span> <span class="ident">sync_directory</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>(
-        <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="self">self</span>,
-        <span class="kw-2">mut</span> <span class="ident">files</span>: <span class="ident">MutexGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">Files</span><span class="op">&gt;</span>,
-        <span class="ident">sync_on_or_after</span>: <span class="ident">Instant</span>,
-    ) -&gt; <span class="ident">io::Result</span><span class="op">&lt;</span><span class="ident">MutexGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">Files</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="kw">loop</span> {
-            <span class="kw">if</span> <span class="ident">files</span>.<span class="ident">directory_synced_at</span>.<span class="ident">is_some</span>()
-                <span class="op">&amp;&amp;</span> <span class="ident">files</span>.<span class="ident">directory_synced_at</span>.<span class="ident">unwrap</span>() <span class="op">&gt;</span><span class="op">=</span> <span class="ident">sync_on_or_after</span>
+    <span class="kw">fn </span>sync_directory&lt;<span class="lifetime">&#39;a</span>&gt;(
+        <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="self">self</span>,
+        <span class="kw-2">mut </span>files: MutexGuard&lt;<span class="lifetime">&#39;a</span>, Files&gt;,
+        sync_on_or_after: Instant,
+    ) -&gt; io::Result&lt;MutexGuard&lt;<span class="lifetime">&#39;a</span>, Files&gt;&gt; {
+        <span class="kw">loop </span>{
+            <span class="kw">if </span>files.directory_synced_at.is_some()
+                &amp;&amp; files.directory_synced_at.unwrap() &gt;= sync_on_or_after
             {
                 <span class="kw">break</span>;
-            } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">files</span>.<span class="ident">directory_is_syncing</span> {
-                <span class="self">self</span>.<span class="ident">data</span>.<span class="ident">dirfsync_sync</span>.<span class="ident">wait</span>(<span class="kw-2">&amp;mut</span> <span class="ident">files</span>);
-            } <span class="kw">else</span> {
-                <span class="ident">files</span>.<span class="ident">directory_is_syncing</span> <span class="op">=</span> <span class="bool-val">true</span>;
-                <span class="ident">drop</span>(<span class="ident">files</span>);
-                <span class="kw">let</span> <span class="ident">directory</span> <span class="op">=</span> <span class="ident">File::open</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">data</span>.<span class="ident">config</span>.<span class="ident">directory</span>)<span class="question-mark">?</span>;
-                <span class="kw">let</span> <span class="ident">synced_at</span> <span class="op">=</span> <span class="ident">Instant::now</span>();
-                <span class="ident">directory</span>.<span class="ident">sync_all</span>()<span class="question-mark">?</span>;
+            } <span class="kw">else if </span>files.directory_is_syncing {
+                <span class="self">self</span>.data.dirfsync_sync.wait(<span class="kw-2">&amp;mut </span>files);
+            } <span class="kw">else </span>{
+                files.directory_is_syncing = <span class="bool-val">true</span>;
+                drop(files);
+                <span class="kw">let </span>directory = File::open(<span class="kw-2">&amp;</span><span class="self">self</span>.data.config.directory)<span class="question-mark">?</span>;
+                <span class="kw">let </span>synced_at = Instant::now();
+                directory.sync_all()<span class="question-mark">?</span>;
 
-                <span class="ident">files</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">data</span>.<span class="ident">files</span>.<span class="ident">lock</span>();
-                <span class="ident">files</span>.<span class="ident">directory_is_syncing</span> <span class="op">=</span> <span class="bool-val">false</span>;
-                <span class="ident">files</span>.<span class="ident">directory_synced_at</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">synced_at</span>);
-                <span class="self">self</span>.<span class="ident">data</span>.<span class="ident">dirfsync_sync</span>.<span class="ident">notify_all</span>();
+                files = <span class="self">self</span>.data.files.lock();
+                files.directory_is_syncing = <span class="bool-val">false</span>;
+                files.directory_synced_at = <span class="prelude-val">Some</span>(synced_at);
+                <span class="self">self</span>.data.dirfsync_sync.notify_all();
                 <span class="kw">break</span>;
             }
         }
 
-        <span class="prelude-val">Ok</span>(<span class="ident">files</span>)
+        <span class="prelude-val">Ok</span>(files)
     }
 
-    <span class="doccomment">/// Opens the log to read previously written data.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Errors</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// May error if:</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// - The file cannot be read.</span>
-    <span class="doccomment">/// - The position refers to data that has been checkpointed.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">read_at</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">position</span>: <span class="ident">LogPosition</span>) -&gt; <span class="ident">io::Result</span><span class="op">&lt;</span><span class="ident">File</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">file</span> <span class="op">=</span> <span class="ident">File::open</span>(
-            <span class="self">self</span>.<span class="ident">data</span>
-                .<span class="ident">config</span>
-                .<span class="ident">directory</span>
-                .<span class="ident">join</span>(<span class="macro">format!</span>(<span class="string">&quot;wal-{}&quot;</span>, <span class="ident">position</span>.<span class="ident">file_id</span>)),
+    <span class="doccomment">/// Opens the log to read previously written data.
+    ///
+    /// # Errors
+    ///
+    /// May error if:
+    ///
+    /// - The file cannot be read.
+    /// - The position refers to data that has been checkpointed.
+    </span><span class="kw">pub fn </span>read_at(<span class="kw-2">&amp;</span><span class="self">self</span>, position: LogPosition) -&gt; io::Result&lt;ChunkReader&gt; {
+        <span class="kw">let </span><span class="kw-2">mut </span>file = File::open(
+            <span class="self">self</span>.data
+                .config
+                .directory
+                .join(<span class="macro">format!</span>(<span class="string">&quot;wal-{}&quot;</span>, position.file_id)),
         )<span class="question-mark">?</span>;
-        <span class="ident">file</span>.<span class="ident">seek</span>(<span class="ident">SeekFrom::Start</span>(<span class="ident">position</span>.<span class="ident">offset</span> <span class="op">+</span> <span class="number">9</span>))<span class="question-mark">?</span>;
-        <span class="prelude-val">Ok</span>(<span class="ident">file</span>)
+        file.seek(SeekFrom::Start(position.offset))<span class="question-mark">?</span>;
+        <span class="kw">let </span><span class="kw-2">mut </span>reader = BufReader::new(file);
+        <span class="kw">let </span><span class="kw-2">mut </span>header_bytes = [<span class="number">0</span>; <span class="number">9</span>];
+        reader.read_exact(<span class="kw-2">&amp;mut </span>header_bytes)<span class="question-mark">?</span>;
+        <span class="kw">let </span>crc32 = u32::from_le_bytes(header_bytes[<span class="number">1</span>..<span class="number">5</span>].try_into().expect(<span class="string">&quot;u32 is 4 bytes&quot;</span>));
+        <span class="kw">let </span>length = u32::from_le_bytes(header_bytes[<span class="number">5</span>..<span class="number">9</span>].try_into().expect(<span class="string">&quot;u32 is 4 bytes&quot;</span>));
+
+        <span class="prelude-val">Ok</span>(ChunkReader {
+            reader,
+            stored_crc32: crc32,
+            length,
+            bytes_remaining: length,
+            read_crc32: <span class="number">0</span>,
+        })
     }
 
-    <span class="doccomment">/// Waits for all other instances of [`WriteAheadLog`] to be dropped and for</span>
-    <span class="doccomment">/// the checkpointing thread to complete.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// This call will not interrupt any writers, and will block indefinitely if</span>
-    <span class="doccomment">/// another instance of this [`WriteAheadLog`] exists and is not eventually</span>
-    <span class="doccomment">/// dropped. This was is the safest to implement, and because a WAL is</span>
-    <span class="doccomment">/// primarily used in front of another storage layer, it follows that the</span>
-    <span class="doccomment">/// shutdown logic of both layers should be synchronized.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">shutdown</span>(<span class="self">self</span>) -&gt; <span class="ident">io::Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">checkpoint_thread</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">data</span>.<span class="ident">checkpoint_thread</span>.<span class="ident">lock</span>();
-        <span class="kw">let</span> <span class="ident">join_handle</span> <span class="op">=</span> <span class="ident">checkpoint_thread</span>.<span class="ident">take</span>().<span class="ident">expect</span>(<span class="string">&quot;shutdown already invoked&quot;</span>);
-        <span class="ident">drop</span>(<span class="ident">checkpoint_thread</span>);
-        <span class="comment">// Dropping self allows the flume::Sender to be freed, as the checkpoint</span>
-        <span class="comment">// thread only has a weak reference while receiving the next file to</span>
-        <span class="comment">// checkpoint.</span>
-        <span class="ident">drop</span>(<span class="self">self</span>);
+    <span class="doccomment">/// Waits for all other instances of [`WriteAheadLog`] to be dropped and for
+    /// the checkpointing thread to complete.
+    ///
+    /// This call will not interrupt any writers, and will block indefinitely if
+    /// another instance of this [`WriteAheadLog`] exists and is not eventually
+    /// dropped. This was is the safest to implement, and because a WAL is
+    /// primarily used in front of another storage layer, it follows that the
+    /// shutdown logic of both layers should be synchronized.
+    </span><span class="kw">pub fn </span>shutdown(<span class="self">self</span>) -&gt; io::Result&lt;()&gt; {
+        <span class="kw">let </span><span class="kw-2">mut </span>checkpoint_thread = <span class="self">self</span>.data.checkpoint_thread.lock();
+        <span class="kw">let </span>join_handle = checkpoint_thread.take().expect(<span class="string">&quot;shutdown already invoked&quot;</span>);
+        drop(checkpoint_thread);
+        <span class="comment">// Dropping self allows the flume::Sender to be freed, as the checkpoint
+        // thread only has a weak reference while receiving the next file to
+        // checkpoint.
+        </span>drop(<span class="self">self</span>);
 
-        <span class="comment">// Wait for the checkpoint thread to terminate.</span>
-        <span class="ident">join_handle</span>
-            .<span class="ident">join</span>()
-            .<span class="ident">map_err</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">io::Error::from</span>(<span class="ident">ErrorKind::BrokenPipe</span>))<span class="question-mark">?</span>
-    }
+        <span class="comment">// Wait for the checkpoint thread to terminate.
+        </span>join_handle
+            .join()
+            .map_err(|<span class="kw">_</span>| io::Error::from(ErrorKind::BrokenPipe))<span class="question-mark">?
+    </span>}
 }
 
-<span class="kw">impl</span> <span class="ident">Files</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">activate_new_file</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">config</span>: <span class="kw-2">&amp;</span><span class="ident">Configuration</span>) -&gt; <span class="ident">io::Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">next_id</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">last_entry_id</span>.<span class="number">0</span> <span class="op">+</span> <span class="number">1</span>;
-        <span class="kw">let</span> <span class="ident">file_name</span> <span class="op">=</span> <span class="macro">format!</span>(<span class="string">&quot;wal-{next_id}&quot;</span>);
-        <span class="kw">let</span> <span class="ident">file</span> <span class="op">=</span> <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">file</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">inactive</span>.<span class="ident">pop_front</span>() {
-            <span class="ident">file</span>.<span class="ident">rename</span>(<span class="kw-2">&amp;</span><span class="ident">file_name</span>)<span class="question-mark">?</span>;
-            <span class="ident">file</span>
-        } <span class="kw">else</span> {
-            <span class="ident">LogFile::write</span>(<span class="ident">next_id</span>, <span class="ident">config</span>.<span class="ident">directory</span>.<span class="ident">join</span>(<span class="ident">file_name</span>), <span class="number">0</span>, <span class="prelude-val">None</span>, <span class="ident">config</span>)<span class="question-mark">?</span>
-        };
+<span class="kw">impl </span>Files {
+    <span class="kw">pub fn </span>activate_new_file(<span class="kw-2">&amp;mut </span><span class="self">self</span>, config: <span class="kw-2">&amp;</span>Configuration) -&gt; io::Result&lt;()&gt; {
+        <span class="kw">let </span>next_id = <span class="self">self</span>.last_entry_id.<span class="number">0 </span>+ <span class="number">1</span>;
+        <span class="kw">let </span>file_name = <span class="macro">format!</span>(<span class="string">&quot;wal-{next_id}&quot;</span>);
+        <span class="kw">let </span>file = <span class="kw">if let </span><span class="prelude-val">Some</span>(file) = <span class="self">self</span>.inactive.pop_front() {
+            file.rename(<span class="kw-2">&amp;</span>file_name)<span class="question-mark">?</span>;
+            file
+        } <span class="kw">else </span>{
+            LogFile::write(next_id, config.directory.join(file_name), <span class="number">0</span>, <span class="prelude-val">None</span>, config)<span class="question-mark">?
+        </span>};
 
-        <span class="self">self</span>.<span class="ident">active</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">file</span>);
+        <span class="self">self</span>.active = <span class="prelude-val">Some</span>(file);
 
         <span class="prelude-val">Ok</span>(())
     }
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>)]</span>
-<span class="kw">enum</span> <span class="ident">WriteResult</span> {
-    <span class="ident">RolledBack</span>,
-    <span class="ident">Entry</span> { <span class="ident">new_length</span>: <span class="ident">u64</span> },
+<span class="attribute">#[derive(Clone, Copy)]
+</span><span class="kw">enum </span>WriteResult {
+    RolledBack,
+    Entry { new_length: u64 },
 }
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-<span class="kw">mod</span> <span class="ident">tests</span>;
+<span class="doccomment">/// A buffered reader for a previously written data chunk.
+///
+/// This reader will stop returning bytes after reading all bytes previously
+/// written.
+</span><span class="attribute">#[derive(Debug)]
+</span><span class="kw">pub struct </span>ChunkReader {
+    reader: BufReader&lt;File&gt;,
+    bytes_remaining: u32,
+    length: u32,
+    stored_crc32: u32,
+    read_crc32: u32,
+}
+
+<span class="kw">impl </span>ChunkReader {
+    <span class="doccomment">/// Returns the length of the data stored.
+    ///
+    /// This value will not change as data is read.
+    </span><span class="attribute">#[must_use]
+    </span><span class="kw">pub const fn </span>chunk_length(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u32 {
+        <span class="self">self</span>.length
+    }
+
+    <span class="doccomment">/// Returns the number of bytes remaining to read.
+    ///
+    /// This value will be updated as read calls return data.
+    </span><span class="attribute">#[must_use]
+    </span><span class="kw">pub const fn </span>bytes_remaining(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u32 {
+        <span class="self">self</span>.bytes_remaining
+    }
+
+    <span class="doccomment">/// Returns true if the stored checksum matches the computed checksum during
+    /// read.
+    ///
+    /// This function returns `None` if the chunk hasn&#39;t been read completely.
+    </span><span class="attribute">#[must_use]
+    </span><span class="kw">pub const fn </span>crc_is_valid(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;bool&gt; {
+        <span class="kw">if </span><span class="self">self</span>.bytes_remaining == <span class="number">0 </span>{
+            <span class="prelude-val">Some</span>(<span class="self">self</span>.stored_crc32 == <span class="self">self</span>.read_crc32)
+        } <span class="kw">else </span>{
+            <span class="prelude-val">None
+        </span>}
+    }
+}
+
+<span class="kw">impl </span>Read <span class="kw">for </span>ChunkReader {
+    <span class="kw">fn </span>read(<span class="kw-2">&amp;mut </span><span class="self">self</span>, <span class="kw-2">mut </span>buf: <span class="kw-2">&amp;mut </span>[u8]) -&gt; io::Result&lt;usize&gt; {
+        <span class="kw">let </span>bytes_remaining =
+            usize::try_from(<span class="self">self</span>.bytes_remaining).expect(<span class="string">&quot;too large for platform&quot;</span>);
+        <span class="kw">if </span>buf.len() &gt; bytes_remaining {
+            buf = <span class="kw-2">&amp;mut </span>buf[..bytes_remaining];
+        }
+        <span class="kw">let </span>bytes_read = <span class="self">self</span>.reader.read(buf)<span class="question-mark">?</span>;
+        <span class="self">self</span>.read_crc32 = crc32c::crc32c_append(<span class="self">self</span>.read_crc32, <span class="kw-2">&amp;</span>buf[..bytes_read]);
+        <span class="self">self</span>.bytes_remaining -= u32::try_from(bytes_read).expect(<span class="string">&quot;can&#39;t be larger than buf.len()&quot;</span>);
+        <span class="prelude-val">Ok</span>(bytes_read)
+    }
+}
+
+<span class="attribute">#[cfg(test)]
+</span><span class="kw">mod </span>tests;
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="okaywal" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0 (a55dd71d5 2022-09-19)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="okaywal" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.0 (69f9c33d7 2022-12-12)" ></div></body></html>

@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/manager.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>manager.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../okaywal/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a><h2 class="location"></h2></nav><nav class="sidebar"><a class="sidebar-logo" href="../../okaywal/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../okaywal/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/manager.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>manager.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../okaywal/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -71,78 +71,78 @@
 <span id="71">71</span>
 <span id="72">72</span>
 <span id="73">73</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">fmt::Debug</span>, <span class="ident">io</span>};
+</pre><pre class="rust"><code><span class="kw">use </span>std::{fmt::Debug, io};
 
-<span class="kw">use</span> <span class="kw">crate</span>::{
-    <span class="ident">entry::EntryId</span>,
-    <span class="ident">log_file</span>::{<span class="ident">Entry</span>, <span class="ident">RecoveredSegment</span>, <span class="ident">SegmentReader</span>},
+<span class="kw">use crate</span>::{
+    entry::EntryId,
+    log_file::{Entry, RecoveredSegment, SegmentReader},
 };
 
-<span class="doccomment">/// Customizes recovery and checkpointing behavior for a</span>
-<span class="doccomment">/// [`WriteAheadLog`](crate::WriteAheadLog).</span>
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">LogManager</span>: <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="ident">Debug</span> <span class="op">+</span> <span class="lifetime">&#39;static</span> {
-    <span class="doccomment">/// When recovering a [`WriteAheadLog`](crate::WriteAheadLog), this function</span>
-    <span class="doccomment">/// is called for each segment as it is read. To allow the segment to have</span>
-    <span class="doccomment">/// its data recovered, return [`Recovery::Recover`]. If you wish to abandon</span>
-    <span class="doccomment">/// the data contained in the segment, return [`Recovery::Abandon`].</span>
-    <span class="kw">fn</span> <span class="ident">should_recover_segment</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">_segment</span>: <span class="kw-2">&amp;</span><span class="ident">RecoveredSegment</span>) -&gt; <span class="ident">io::Result</span><span class="op">&lt;</span><span class="ident">Recovery</span><span class="op">&gt;</span> {
-        <span class="prelude-val">Ok</span>(<span class="ident">Recovery::Recover</span>)
+<span class="doccomment">/// Customizes recovery and checkpointing behavior for a
+/// [`WriteAheadLog`](crate::WriteAheadLog).
+</span><span class="kw">pub trait </span>LogManager: Send + Sync + Debug + <span class="lifetime">&#39;static </span>{
+    <span class="doccomment">/// When recovering a [`WriteAheadLog`](crate::WriteAheadLog), this function
+    /// is called for each segment as it is read. To allow the segment to have
+    /// its data recovered, return [`Recovery::Recover`]. If you wish to abandon
+    /// the data contained in the segment, return [`Recovery::Abandon`].
+    </span><span class="kw">fn </span>should_recover_segment(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _segment: <span class="kw-2">&amp;</span>RecoveredSegment) -&gt; io::Result&lt;Recovery&gt; {
+        <span class="prelude-val">Ok</span>(Recovery::Recover)
     }
 
-    <span class="doccomment">/// Invoked once for each entry contained in all recovered segments within a</span>
-    <span class="doccomment">/// [`WriteAheadLog`](crate::WriteAheadLog).</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// [`Entry::read_chunk()`] can be used to read each chunk of data that was</span>
-    <span class="doccomment">/// written via</span>
-    <span class="doccomment">/// [`EntryWriter::write_chunk`](crate::EntryWriter::write_chunk). The order</span>
-    <span class="doccomment">/// of chunks is guaranteed to be the same as the order they were written</span>
-    <span class="doccomment">/// in.</span>
-    <span class="kw">fn</span> <span class="ident">recover</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">entry</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Entry</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">io::Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span>;
+    <span class="doccomment">/// Invoked once for each entry contained in all recovered segments within a
+    /// [`WriteAheadLog`](crate::WriteAheadLog).
+    ///
+    /// [`Entry::read_chunk()`] can be used to read each chunk of data that was
+    /// written via
+    /// [`EntryWriter::write_chunk`](crate::EntryWriter::write_chunk). The order
+    /// of chunks is guaranteed to be the same as the order they were written
+    /// in.
+    </span><span class="kw">fn </span>recover(<span class="kw-2">&amp;mut </span><span class="self">self</span>, entry: <span class="kw-2">&amp;mut </span>Entry&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; io::Result&lt;()&gt;;
 
-    <span class="doccomment">/// Invoked each time the [`WriteAheadLog`](crate::WriteAheadLog) is ready to recycle and reuse</span>
-    <span class="doccomment">/// segment files.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// `last_checkpointed_id` is the id of the last entry that is being</span>
-    <span class="doccomment">/// checkedpointed and removed from the log. If needed,</span>
-    <span class="doccomment">/// `checkpointed_entries` can be used to iterate over all entries that are</span>
-    <span class="doccomment">/// being checkpointed.</span>
-    <span class="kw">fn</span> <span class="ident">checkpoint_to</span>(
-        <span class="kw-2">&amp;mut</span> <span class="self">self</span>,
-        <span class="ident">last_checkpointed_id</span>: <span class="ident">EntryId</span>,
-        <span class="ident">checkpointed_entries</span>: <span class="kw-2">&amp;mut</span> <span class="ident">SegmentReader</span>,
-    ) -&gt; <span class="ident">io::Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span>;
+    <span class="doccomment">/// Invoked each time the [`WriteAheadLog`](crate::WriteAheadLog) is ready to recycle and reuse
+    /// segment files.
+    ///
+    /// `last_checkpointed_id` is the id of the last entry that is being
+    /// checkedpointed and removed from the log. If needed,
+    /// `checkpointed_entries` can be used to iterate over all entries that are
+    /// being checkpointed.
+    </span><span class="kw">fn </span>checkpoint_to(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        last_checkpointed_id: EntryId,
+        checkpointed_entries: <span class="kw-2">&amp;mut </span>SegmentReader,
+    ) -&gt; io::Result&lt;()&gt;;
 }
 
-<span class="doccomment">/// Determines whether to recover a segment or not.</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">Recovery</span> {
-    <span class="doccomment">/// Recover the segment.</span>
-    <span class="ident">Recover</span>,
-    <span class="doccomment">/// Abandon the segment and any entries stored within it. **Warning: This</span>
-    <span class="doccomment">/// means losing data that was previously written to the log. This should</span>
-    <span class="doccomment">/// rarely, if ever, be done.**</span>
-    <span class="ident">Abandon</span>,
+<span class="doccomment">/// Determines whether to recover a segment or not.
+</span><span class="kw">pub enum </span>Recovery {
+    <span class="doccomment">/// Recover the segment.
+    </span>Recover,
+    <span class="doccomment">/// Abandon the segment and any entries stored within it. **Warning: This
+    /// means losing data that was previously written to the log. This should
+    /// rarely, if ever, be done.**
+    </span>Abandon,
 }
 
-<span class="doccomment">/// A [`LogManager`] that does not attempt to recover any existing data.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">LogVoid</span>;
+<span class="doccomment">/// A [`LogManager`] that does not attempt to recover any existing data.
+</span><span class="attribute">#[derive(Debug)]
+</span><span class="kw">pub struct </span>LogVoid;
 
-<span class="kw">impl</span> <span class="ident">LogManager</span> <span class="kw">for</span> <span class="ident">LogVoid</span> {
-    <span class="kw">fn</span> <span class="ident">should_recover_segment</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">_segment</span>: <span class="kw-2">&amp;</span><span class="ident">RecoveredSegment</span>) -&gt; <span class="ident">io::Result</span><span class="op">&lt;</span><span class="ident">Recovery</span><span class="op">&gt;</span> {
-        <span class="prelude-val">Ok</span>(<span class="ident">Recovery::Abandon</span>)
+<span class="kw">impl </span>LogManager <span class="kw">for </span>LogVoid {
+    <span class="kw">fn </span>should_recover_segment(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _segment: <span class="kw-2">&amp;</span>RecoveredSegment) -&gt; io::Result&lt;Recovery&gt; {
+        <span class="prelude-val">Ok</span>(Recovery::Abandon)
     }
 
-    <span class="kw">fn</span> <span class="ident">recover</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">_entry</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Entry</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">io::Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">fn </span>recover(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _entry: <span class="kw-2">&amp;mut </span>Entry&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; io::Result&lt;()&gt; {
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="kw">fn</span> <span class="ident">checkpoint_to</span>(
-        <span class="kw-2">&amp;mut</span> <span class="self">self</span>,
-        <span class="ident">_last_checkpointed_id</span>: <span class="ident">EntryId</span>,
-        <span class="ident">_reader</span>: <span class="kw-2">&amp;mut</span> <span class="ident">SegmentReader</span>,
-    ) -&gt; <span class="ident">io::Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">fn </span>checkpoint_to(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        _last_checkpointed_id: EntryId,
+        _reader: <span class="kw-2">&amp;mut </span>SegmentReader,
+    ) -&gt; io::Result&lt;()&gt; {
         <span class="prelude-val">Ok</span>(())
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="okaywal" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0 (a55dd71d5 2022-09-19)" ></div></body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="okaywal" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.0 (69f9c33d7 2022-12-12)" ></div></body></html>
