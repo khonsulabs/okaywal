@@ -12,7 +12,7 @@ use crate::{
     buffered::Buffered,
     entry::{EntryId, CHUNK, END_OF_ENTRY, NEW_ENTRY},
     to_io_result::ToIoResult,
-    Configuration,
+    Configuration, LogPosition,
 };
 
 #[derive(Debug, Clone)]
@@ -264,6 +264,7 @@ impl Write for LogFileWriter {
 /// Reads a log segment, which contains one or more log entries.
 #[derive(Debug)]
 pub struct SegmentReader {
+    pub(crate) file_id: u64,
     pub(crate) file: BufReader<File>,
     pub(crate) header: RecoveredSegment,
     pub(crate) current_entry_id: Option<EntryId>,
@@ -273,7 +274,7 @@ pub struct SegmentReader {
 }
 
 impl SegmentReader {
-    pub(crate) fn new(path: &Path) -> io::Result<Self> {
+    pub(crate) fn new(path: &Path, file_id: u64) -> io::Result<Self> {
         let mut file = File::open(path)?;
         file.seek(SeekFrom::Start(0))?;
         let mut file = BufReader::new(file);
@@ -304,6 +305,7 @@ impl SegmentReader {
         };
 
         Ok(Self {
+            file_id,
             file,
             header,
             current_entry_id: None,
@@ -418,8 +420,13 @@ impl<'entry> Entry<'entry> {
         match self.reader.file.buffer().first().copied() {
             Some(CHUNK) => {
                 let mut header_bytes = [0; 9];
+                let offset = self.reader.file.stream_position()?;
                 self.reader.file.read_exact(&mut header_bytes)?;
                 Ok(ReadChunkResult::Chunk(EntryChunk {
+                    position: LogPosition {
+                        file_id: self.reader.file_id,
+                        offset,
+                    },
                     entry: self,
                     calculated_crc: 0,
                     stored_crc: u32::from_le_bytes(
@@ -488,12 +495,19 @@ pub enum ReadChunkResult<'chunk, 'entry> {
 #[derive(Debug)]
 pub struct EntryChunk<'chunk, 'entry> {
     entry: &'chunk mut Entry<'entry>,
+    position: LogPosition,
     bytes_remaining: u32,
     stored_crc: u32,
     calculated_crc: u32,
 }
 
 impl<'chunk, 'entry> EntryChunk<'chunk, 'entry> {
+    /// Returns the position that this chunk is located at.
+    #[must_use]
+    pub fn log_position(&self) -> LogPosition {
+        self.position
+    }
+
     /// Returns the number of bytes remaining to read from this chunk.
     #[must_use]
     pub const fn bytes_remaining(&self) -> u32 {

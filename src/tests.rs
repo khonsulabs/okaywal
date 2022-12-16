@@ -110,9 +110,10 @@ fn basic() {
     drop(invocations);
 
     let mut reader = wal.read_at(record.position).unwrap();
-    let mut buffer = vec![0; message.len()];
-    reader.read_exact(&mut buffer).unwrap();
+    let mut buffer = Vec::new();
+    reader.read_to_end(&mut buffer).unwrap();
     assert_eq!(buffer, message);
+    assert_eq!(reader.crc_is_valid(), Some(true));
 }
 
 #[derive(Debug, Default, Clone)]

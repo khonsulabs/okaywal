@@ -16,7 +16,7 @@
 use std::{
     collections::VecDeque,
     fs::{self, File},
-    io::{self, ErrorKind, Seek, SeekFrom},
+    io::{self, BufReader, ErrorKind, Read, Seek, SeekFrom},
     path::Path,
     sync::{Arc, Weak},
     thread::JoinHandle,
@@ -27,11 +27,11 @@ use parking_lot::{Condvar, Mutex, MutexGuard};
 
 pub use crate::{
     config::Configuration,
-    entry::{EntryId, EntryWriter},
+    entry::{ChunkRecord, EntryId, EntryWriter, LogPosition},
     log_file::{Entry, EntryChunk, ReadChunkResult, RecoveredSegment, SegmentReader},
     manager::{LogManager, LogVoid, Recovery},
 };
-use crate::{entry::LogPosition, log_file::LogFile, to_io_result::ToIoResult};
+use crate::{log_file::LogFile, to_io_result::ToIoResult};
 
 mod buffered;
 mod config;
@@ -124,7 +124,7 @@ impl WriteAheadLog {
                     .inactive
                     .push_back(LogFile::write(entry_id, path, 0, None, &config)?);
             } else {
-                let mut reader = SegmentReader::new(&path)?;
+                let mut reader = SegmentReader::new(&path, entry_id)?;
                 match manager.should_recover_segment(&reader.header)? {
                     Recovery::Recover => {
                         while let Some(mut entry) = reader.read_entry()? {
@@ -289,7 +289,7 @@ impl WriteAheadLog {
                 writer = file_to_checkpoint.synchronize_locked(writer, synchronize_target)?;
             }
             if let Some(entry_id) = writer.last_entry_id() {
-                let mut reader = SegmentReader::new(writer.path())?;
+                let mut reader = SegmentReader::new(writer.path(), writer.id())?;
                 let mut manager = wal.data.manager.lock();
                 manager.checkpoint_to(entry_id, &mut reader)?;
             }
@@ -356,15 +356,27 @@ impl WriteAheadLog {
     ///
     /// - The file cannot be read.
     /// - The position refers to data that has been checkpointed.
-    pub fn read_at(&self, position: LogPosition) -> io::Result<File> {
+    pub fn read_at(&self, position: LogPosition) -> io::Result<ChunkReader> {
         let mut file = File::open(
             self.data
                 .config
                 .directory
                 .join(format!("wal-{}", position.file_id)),
         )?;
-        file.seek(SeekFrom::Start(position.offset + 9))?;
-        Ok(file)
+        file.seek(SeekFrom::Start(position.offset))?;
+        let mut reader = BufReader::new(file);
+        let mut header_bytes = [0; 9];
+        reader.read_exact(&mut header_bytes)?;
+        let crc32 = u32::from_le_bytes(header_bytes[1..5].try_into().expect("u32 is 4 bytes"));
+        let length = u32::from_le_bytes(header_bytes[5..9].try_into().expect("u32 is 4 bytes"));
+
+        Ok(ChunkReader {
+            reader,
+            stored_crc32: crc32,
+            length,
+            bytes_remaining: length,
+            read_crc32: 0,
+        })
     }
 
     /// Waits for all other instances of [`WriteAheadLog`] to be dropped and for
@@ -412,6 +424,64 @@ impl Files {
 enum WriteResult {
     RolledBack,
     Entry { new_length: u64 },
+}
+
+/// A buffered reader for a previously written data chunk.
+///
+/// This reader will stop returning bytes after reading all bytes previously
+/// written.
+#[derive(Debug)]
+pub struct ChunkReader {
+    reader: BufReader<File>,
+    bytes_remaining: u32,
+    length: u32,
+    stored_crc32: u32,
+    read_crc32: u32,
+}
+
+impl ChunkReader {
+    /// Returns the length of the data stored.
+    ///
+    /// This value will not change as data is read.
+    #[must_use]
+    pub const fn chunk_length(&self) -> u32 {
+        self.length
+    }
+
+    /// Returns the number of bytes remaining to read.
+    ///
+    /// This value will be updated as read calls return data.
+    #[must_use]
+    pub const fn bytes_remaining(&self) -> u32 {
+        self.bytes_remaining
+    }
+
+    /// Returns true if the stored checksum matches the computed checksum during
+    /// read.
+    ///
+    /// This function returns `None` if the chunk hasn't been read completely.
+    #[must_use]
+    pub const fn crc_is_valid(&self) -> Option<bool> {
+        if self.bytes_remaining == 0 {
+            Some(self.stored_crc32 == self.read_crc32)
+        } else {
+            None
+        }
+    }
+}
+
+impl Read for ChunkReader {
+    fn read(&mut self, mut buf: &mut [u8]) -> io::Result<usize> {
+        let bytes_remaining =
+            usize::try_from(self.bytes_remaining).expect("too large for platform");
+        if buf.len() > bytes_remaining {
+            buf = &mut buf[..bytes_remaining];
+        }
+        let bytes_read = self.reader.read(buf)?;
+        self.read_crc32 = crc32c::crc32c_append(self.read_crc32, &buf[..bytes_read]);
+        self.bytes_remaining -= u32::try_from(bytes_read).expect("can't be larger than buf.len()");
+        Ok(bytes_read)
+    }
 }
 
 #[cfg(test)]
