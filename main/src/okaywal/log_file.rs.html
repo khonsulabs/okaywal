@@ -577,6 +577,7 @@
 <span id="577">577</span>
 <span id="578">578</span>
 <span id="579">579</span>
+<span id="580">580</span>
 </pre><pre class="rust"><code><span class="kw">use </span>std::{
     fs::{File, OpenOptions},
     io::{<span class="self">self</span>, BufRead, BufReader, ErrorKind, Read, Seek, SeekFrom, Write},
@@ -753,6 +754,7 @@
 
         <span class="kw">if </span>validated_length == <span class="number">0 </span>{
             <span class="self">Self</span>::write_header(<span class="kw-2">&amp;mut </span>file, <span class="kw-2">&amp;</span>config.version_info, <span class="bool-val">false</span>)<span class="question-mark">?</span>;
+            file.flush()<span class="question-mark">?</span>;
         }
 
         <span class="prelude-val">Ok</span>(<span class="self">Self </span>{

@@ -69,6 +69,38 @@
 <span id="69">69</span>
 <span id="70">70</span>
 <span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
+<span id="88">88</span>
+<span id="89">89</span>
+<span id="90">90</span>
+<span id="91">91</span>
+<span id="92">92</span>
+<span id="93">93</span>
+<span id="94">94</span>
+<span id="95">95</span>
+<span id="96">96</span>
+<span id="97">97</span>
+<span id="98">98</span>
+<span id="99">99</span>
+<span id="100">100</span>
+<span id="101">101</span>
+<span id="102">102</span>
+<span id="103">103</span>
 </pre><pre class="rust"><code><span class="kw">use </span>std::{
     io,
     ops::Mul,
@@ -80,6 +112,7 @@
 
 <span class="doccomment">/// A [`WriteAheadLog`] configuration.
 </span><span class="attribute">#[derive(Debug)]
+#[must_use]
 </span><span class="kw">pub struct </span>Configuration {
     <span class="doccomment">/// The directory to store the log files in.
     </span><span class="kw">pub </span>directory: PathBuf,
@@ -126,6 +159,37 @@
             version_info: Arc::default(),
         }
     }
+
+    <span class="doccomment">/// Sets the number of bytes to preallocate for each segment file. Returns self.
+    ///
+    /// Preallocating disk space allows for more consistent performance. This
+    /// number should be large enough to allow batching multiple entries into
+    /// one checkpointing operation.
+    </span><span class="kw">pub fn </span>preallocate_bytes(<span class="kw-2">mut </span><span class="self">self</span>, bytes: u32) -&gt; <span class="self">Self </span>{
+        <span class="self">self</span>.preallocate_bytes = bytes;
+        <span class="self">self
+    </span>}
+
+    <span class="doccomment">/// Sets the number of bytes written required to begin a checkpoint
+    /// operation. Returns self.
+    ///
+    /// This value should be smaller than `preallocate_bytes` tp ensure
+    /// checkpoint operations begin before too much data is written in a log
+    /// entry. If more data is written before a checkpoint occurs, the segment
+    /// will grow to accomodate the extra data, but that write will not be as
+    /// fast due to needing to allocate more space from the filesystem to
+    /// perform the write.
+    </span><span class="kw">pub fn </span>checkpoint_after_bytes(<span class="kw-2">mut </span><span class="self">self</span>, bytes: u64) -&gt; <span class="self">Self </span>{
+        <span class="self">self</span>.checkpoint_after_bytes = bytes;
+        <span class="self">self
+    </span>}
+
+    <span class="doccomment">/// Sets the number of bytes to use for internal buffers when reading and
+    /// writing data to the log.
+    </span><span class="kw">pub fn </span>buffer_bytes(<span class="kw-2">mut </span><span class="self">self</span>, bytes: usize) -&gt; <span class="self">Self </span>{
+        <span class="self">self</span>.buffer_bytes = bytes;
+        <span class="self">self
+    </span>}
 
     <span class="doccomment">/// Opens the log using the provided log manager with this configuration.
     </span><span class="kw">pub fn </span>open&lt;Manager: LogManager&gt;(<span class="self">self</span>, manager: Manager) -&gt; io::Result&lt;WriteAheadLog&gt; {

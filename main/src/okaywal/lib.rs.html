@@ -486,6 +486,9 @@
 <span id="486">486</span>
 <span id="487">487</span>
 <span id="488">488</span>
+<span id="489">489</span>
+<span id="490">490</span>
+<span id="491">491</span>
 </pre><pre class="rust"><code><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;.crate-docs.md&quot;</span>)]
 #![forbid(unsafe_code)]
 #![warn(
@@ -845,7 +848,10 @@
     /// - The file cannot be read.
     /// - The position refers to data that has been checkpointed.
     </span><span class="kw">pub fn </span>read_at(<span class="kw-2">&amp;</span><span class="self">self</span>, position: LogPosition) -&gt; io::Result&lt;ChunkReader&gt; {
-        <span class="kw">let </span><span class="kw-2">mut </span>file = File::open(
+        <span class="comment">// TODO we should keep track of how many readers we have open for a
+        // given wal file to prevent the truncation operation in a checkpoint if
+        // a reader is still open.
+        </span><span class="kw">let </span><span class="kw-2">mut </span>file = File::open(
             <span class="self">self</span>.data
                 .config
                 .directory
