@@ -174,6 +174,7 @@ impl LogFileWriter {
 
         if validated_length == 0 {
             Self::write_header(&mut file, &config.version_info, false)?;
+            file.flush()?;
         }
 
         Ok(Self {

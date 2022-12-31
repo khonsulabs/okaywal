@@ -9,6 +9,7 @@ use crate::{LogManager, WriteAheadLog};
 
 /// A [`WriteAheadLog`] configuration.
 #[derive(Debug)]
+#[must_use]
 pub struct Configuration {
     /// The directory to store the log files in.
     pub directory: PathBuf,
@@ -54,6 +55,37 @@ impl Configuration {
             buffer_bytes: kilobytes(16),
             version_info: Arc::default(),
         }
+    }
+
+    /// Sets the number of bytes to preallocate for each segment file. Returns self.
+    ///
+    /// Preallocating disk space allows for more consistent performance. This
+    /// number should be large enough to allow batching multiple entries into
+    /// one checkpointing operation.
+    pub fn preallocate_bytes(mut self, bytes: u32) -> Self {
+        self.preallocate_bytes = bytes;
+        self
+    }
+
+    /// Sets the number of bytes written required to begin a checkpoint
+    /// operation. Returns self.
+    ///
+    /// This value should be smaller than `preallocate_bytes` tp ensure
+    /// checkpoint operations begin before too much data is written in a log
+    /// entry. If more data is written before a checkpoint occurs, the segment
+    /// will grow to accomodate the extra data, but that write will not be as
+    /// fast due to needing to allocate more space from the filesystem to
+    /// perform the write.
+    pub fn checkpoint_after_bytes(mut self, bytes: u64) -> Self {
+        self.checkpoint_after_bytes = bytes;
+        self
+    }
+
+    /// Sets the number of bytes to use for internal buffers when reading and
+    /// writing data to the log.
+    pub fn buffer_bytes(mut self, bytes: usize) -> Self {
+        self.buffer_bytes = bytes;
+        self
     }
 
     /// Opens the log using the provided log manager with this configuration.

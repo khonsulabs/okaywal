@@ -357,6 +357,9 @@ impl WriteAheadLog {
     /// - The file cannot be read.
     /// - The position refers to data that has been checkpointed.
     pub fn read_at(&self, position: LogPosition) -> io::Result<ChunkReader> {
+        // TODO we should keep track of how many readers we have open for a
+        // given wal file to prevent the truncation operation in a checkpoint if
+        // a reader is still open.
         let mut file = File::open(
             self.data
                 .config
