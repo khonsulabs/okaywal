@@ -14,7 +14,7 @@
 )]
 
 use std::{
-    collections::VecDeque,
+    collections::{HashMap, VecDeque},
     fs::{self, File},
     io::{self, BufReader, ErrorKind, Read, Seek, SeekFrom},
     path::Path,
@@ -70,6 +70,8 @@ struct Data {
     config: Configuration,
     checkpoint_sender: flume::Sender<LogFile>,
     checkpoint_thread: Mutex<Option<JoinHandle<io::Result<()>>>>,
+    readers: Mutex<HashMap<u64, usize>>,
+    readers_sync: Condvar,
 }
 
 #[derive(Debug, Default)]
@@ -170,6 +172,8 @@ impl WriteAheadLog {
                 config,
                 checkpoint_sender,
                 checkpoint_thread: Mutex::new(None),
+                readers: Mutex::default(),
+                readers_sync: Condvar::new(),
             }),
         };
 
@@ -294,7 +298,7 @@ impl WriteAheadLog {
                 manager.checkpoint_to(entry_id, &mut reader)?;
             }
 
-            // Prepare the writer to be recycled.
+            // Rename the file to denote that it's been checkpointed.
             let new_name = format!(
                 "{}-cp",
                 writer
@@ -304,10 +308,23 @@ impl WriteAheadLog {
                     .to_str()
                     .expect("should be ascii")
             );
+            writer.rename(&new_name)?;
+
+            // Now, read attemps will fail, but any current readers are still
+            // able to read the data. Before we truncate the file, we need to
+            // wait for all existing readers to close.
+            let mut readers = wal.data.readers.lock();
+            while readers.get(&writer.id()).copied().unwrap_or(0) > 0 {
+                wal.data.readers_sync.wait(&mut readers);
+            }
+            readers.remove(&writer.id());
+            drop(readers);
+
+            // Now that there are no readers, we can safely prepare the file for
+            // reuse.
             writer.revert_to(0)?;
             drop(writer);
 
-            file_to_checkpoint.rename(&new_name)?;
             let sync_target = Instant::now();
 
             let files = wal.data.files.lock();
@@ -356,10 +373,7 @@ impl WriteAheadLog {
     ///
     /// - The file cannot be read.
     /// - The position refers to data that has been checkpointed.
-    pub fn read_at(&self, position: LogPosition) -> io::Result<ChunkReader> {
-        // TODO we should keep track of how many readers we have open for a
-        // given wal file to prevent the truncation operation in a checkpoint if
-        // a reader is still open.
+    pub fn read_at(&self, position: LogPosition) -> io::Result<ChunkReader<'_>> {
         let mut file = File::open(
             self.data
                 .config
@@ -372,7 +386,14 @@ impl WriteAheadLog {
         reader.read_exact(&mut header_bytes)?;
         let length = u32::from_le_bytes(header_bytes[1..5].try_into().expect("u32 is 4 bytes"));
 
+        let mut readers = self.data.readers.lock();
+        let file_readers = readers.entry(position.file_id).or_default();
+        *file_readers += 1;
+        drop(readers);
+
         Ok(ChunkReader {
+            wal: self,
+            file_id: position.file_id,
             reader,
             stored_crc32: None,
             length,
@@ -433,7 +454,9 @@ enum WriteResult {
 /// This reader will stop returning bytes after reading all bytes previously
 /// written.
 #[derive(Debug)]
-pub struct ChunkReader {
+pub struct ChunkReader<'a> {
+    wal: &'a WriteAheadLog,
+    file_id: u64,
     reader: BufReader<File>,
     bytes_remaining: u32,
     length: u32,
@@ -441,7 +464,7 @@ pub struct ChunkReader {
     read_crc32: u32,
 }
 
-impl ChunkReader {
+impl<'a> ChunkReader<'a> {
     /// Returns the length of the data stored.
     ///
     /// This value will not change as data is read.
@@ -482,7 +505,7 @@ impl ChunkReader {
     }
 }
 
-impl Read for ChunkReader {
+impl<'a> Read for ChunkReader<'a> {
     fn read(&mut self, mut buf: &mut [u8]) -> io::Result<usize> {
         let bytes_remaining =
             usize::try_from(self.bytes_remaining).expect("too large for platform");
@@ -493,6 +516,18 @@ impl Read for ChunkReader {
         self.read_crc32 = crc32c::crc32c_append(self.read_crc32, &buf[..bytes_read]);
         self.bytes_remaining -= u32::try_from(bytes_read).expect("can't be larger than buf.len()");
         Ok(bytes_read)
+    }
+}
+
+impl<'a> Drop for ChunkReader<'a> {
+    fn drop(&mut self) {
+        let mut readers = self.wal.data.readers.lock();
+        let file_readers = readers
+            .get_mut(&self.file_id)
+            .expect("reader entry not present");
+        *file_readers -= 1;
+        drop(readers);
+        self.wal.data.readers_sync.notify_one();
     }
 }
 

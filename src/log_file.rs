@@ -53,17 +53,8 @@ impl LogFile {
 
     pub fn rename(&self, new_name: &str) -> io::Result<()> {
         let mut writer = self.data.writer.lock();
-        let new_path = writer
-            .path
-            .parent()
-            .expect("parent path not found")
-            .join(new_name);
-        std::fs::rename(&*writer.path, &new_path)?;
-        writer.path = Arc::new(new_path);
-
-        Ok(())
+        writer.rename(new_name)
     }
-
     pub fn synchronize(&self, target_synced_bytes: u64) -> io::Result<()> {
         // Flush the buffer to disk.
         let data = self.lock();
@@ -237,6 +228,18 @@ impl LogFileWriter {
             Self::write_header(&mut self.file, &self.version_info, true)?;
             self.last_entry_id = None;
         }
+
+        Ok(())
+    }
+
+    pub fn rename(&mut self, new_name: &str) -> io::Result<()> {
+        let new_path = self
+            .path
+            .parent()
+            .expect("parent path not found")
+            .join(new_name);
+        std::fs::rename(&*self.path, &new_path)?;
+        self.path = Arc::new(new_path);
 
         Ok(())
     }
