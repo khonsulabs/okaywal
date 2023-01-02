@@ -1,5 +1,8 @@
 use std::io::{self, Write};
 
+use crc32c::crc32c_append;
+use parking_lot::MutexGuard;
+
 use crate::{
     log_file::{LogFile, LogFileWriter},
     to_io_result::ToIoResult,
@@ -96,23 +99,34 @@ impl<'a> EntryWriter<'a> {
     /// Appends a chunk of data to this log entry. Each chunk of data is able to
     /// be read using [`Entry::read_chunk`](crate::Entry).
     pub fn write_chunk(&mut self, data: &[u8]) -> io::Result<ChunkRecord> {
-        let length = u32::try_from(data.len()).to_io()?;
+        let mut writer = self.begin_chunk(u32::try_from(data.len()).to_io()?)?;
+        writer.write_all(data)?;
+        writer.finish()
+    }
+
+    /// Begins writing a chunk with the given `length`.
+    ///
+    /// The writer returned already contains an internal buffer. This function
+    /// can be used to write a complex payload without needing to first
+    /// combine it in another buffer.
+    pub fn begin_chunk(&mut self, length: u32) -> io::Result<ChunkWriter<'_>> {
         let mut file = self.file.as_ref().expect("already dropped").lock();
+
         let position = LogPosition {
             file_id: file.id(),
             offset: file.position(),
         };
-        let crc = crc32c::crc32c(data);
-        let mut header = [CHUNK; 9];
-        header[1..5].copy_from_slice(&crc.to_le_bytes());
-        header[5..].copy_from_slice(&length.to_le_bytes());
-        file.write_all(&header)?;
-        file.write_all(data)?;
 
-        Ok(ChunkRecord {
+        file.write_all(&[CHUNK])?;
+        file.write_all(&length.to_le_bytes())?;
+
+        Ok(ChunkWriter {
+            file,
             position,
-            crc,
             length,
+            bytes_remaining: length,
+            crc32: 0,
+            finished: false,
         })
     }
 }
@@ -122,6 +136,67 @@ impl<'a> Drop for EntryWriter<'a> {
         if self.file.is_some() {
             self.rollback_session().unwrap();
         }
+    }
+}
+
+pub struct ChunkWriter<'a> {
+    file: MutexGuard<'a, LogFileWriter>,
+    position: LogPosition,
+    length: u32,
+    bytes_remaining: u32,
+    crc32: u32,
+    finished: bool,
+}
+
+impl<'a> ChunkWriter<'a> {
+    pub fn finish(mut self) -> io::Result<ChunkRecord> {
+        self.write_tail()?;
+        Ok(ChunkRecord {
+            position: self.position,
+            crc: self.crc32,
+            length: self.length,
+        })
+    }
+
+    fn write_tail(&mut self) -> io::Result<()> {
+        self.finished = true;
+
+        if self.bytes_remaining != 0 {
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                "written length does not match expected length",
+            ));
+        }
+
+        self.file.write_all(&self.crc32.to_le_bytes())
+    }
+}
+
+impl<'a> Drop for ChunkWriter<'a> {
+    fn drop(&mut self) {
+        if !self.finished {
+            self.write_tail()
+                .expect("chunk writer dropped without finishing");
+        }
+    }
+}
+
+impl<'a> Write for ChunkWriter<'a> {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        let bytes_to_write = buf
+            .len()
+            .min(usize::try_from(self.bytes_remaining).to_io()?);
+
+        let bytes_written = self.file.write(&buf[..bytes_to_write])?;
+        if bytes_written > 0 {
+            self.bytes_remaining -= u32::try_from(bytes_written).to_io()?;
+            self.crc32 = crc32c_append(self.crc32, &buf[..bytes_written]);
+        }
+        Ok(bytes_written)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
     }
 }
 

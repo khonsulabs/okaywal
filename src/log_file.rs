@@ -350,7 +350,7 @@ impl SegmentReader {
         if let Some(id) = self.current_entry_id.take() {
             // Skip the remainder of the current entry.
             let mut entry = Entry { id, reader: self };
-            while let Some(mut chunk) = match entry.read_chunk()? {
+            while let Some(chunk) = match entry.read_chunk()? {
                 ReadChunkResult::Chunk(chunk) => Some(chunk),
                 _ => None,
             } {
@@ -420,7 +420,7 @@ impl<'entry> Entry<'entry> {
 
         match self.reader.file.buffer().first().copied() {
             Some(CHUNK) => {
-                let mut header_bytes = [0; 9];
+                let mut header_bytes = [0; 5];
                 let offset = self.reader.file.stream_position()?;
                 self.reader.file.read_exact(&mut header_bytes)?;
                 Ok(ReadChunkResult::Chunk(EntryChunk {
@@ -430,11 +430,9 @@ impl<'entry> Entry<'entry> {
                     },
                     entry: self,
                     calculated_crc: 0,
-                    stored_crc: u32::from_le_bytes(
-                        header_bytes[1..5].try_into().expect("u32 is 4 bytes"),
-                    ),
+                    stored_crc32: None,
                     bytes_remaining: u32::from_le_bytes(
-                        header_bytes[5..].try_into().expect("u32 is 4 bytes"),
+                        header_bytes[1..5].try_into().expect("u32 is 4 bytes"),
                     ),
                 }))
             }
@@ -498,8 +496,8 @@ pub struct EntryChunk<'chunk, 'entry> {
     entry: &'chunk mut Entry<'entry>,
     position: LogPosition,
     bytes_remaining: u32,
-    stored_crc: u32,
     calculated_crc: u32,
+    stored_crc32: Option<u32>,
 }
 
 impl<'chunk, 'entry> EntryChunk<'chunk, 'entry> {
@@ -516,14 +514,24 @@ impl<'chunk, 'entry> EntryChunk<'chunk, 'entry> {
     }
 
     /// Returns true if the CRC has been validated, or false if the computed crc
-    /// is different than the stored crc. Returns `None` if not all data has
-    /// been read yet.
-    #[must_use]
-    pub const fn check_crc(&self) -> Option<bool> {
-        if self.bytes_remaining > 0 {
-            None
+    /// is different than the stored crc. Returns an error if the chunk has not
+    /// been fully read yet.
+    pub fn check_crc(&mut self) -> io::Result<bool> {
+        if self.bytes_remaining == 0 {
+            if self.stored_crc32.is_none() {
+                let mut stored_crc32 = [0; 4];
+                // Bypass our internal read, otherwise our crc would include the
+                // crc read itself.
+                self.entry.reader.file.read_exact(&mut stored_crc32)?;
+                self.stored_crc32 = Some(u32::from_le_bytes(stored_crc32));
+            }
+
+            Ok(self.stored_crc32.expect("already initialized") == self.calculated_crc)
         } else {
-            Some(self.stored_crc == self.calculated_crc)
+            Err(io::Error::new(
+                io::ErrorKind::Other,
+                "crc cannot be checked before reading all chunk bytes",
+            ))
         }
     }
 
@@ -535,12 +543,18 @@ impl<'chunk, 'entry> EntryChunk<'chunk, 'entry> {
     }
 
     /// Advances past the end of this chunk without reading the remaining bytes.
-    pub fn skip_remaining_bytes(&mut self) -> io::Result<()> {
-        if self.bytes_remaining > 0 {
+    pub fn skip_remaining_bytes(mut self) -> io::Result<()> {
+        self.skip_remaining_bytes_internal()
+    }
+
+    /// Advances past the end of this chunk without reading the remaining bytes.
+    fn skip_remaining_bytes_internal(&mut self) -> io::Result<()> {
+        if self.bytes_remaining > 0 || self.stored_crc32.is_none() {
+            // Skip past the remaining bytes plus the crc.
             self.entry
                 .reader
                 .file
-                .seek(SeekFrom::Current(i64::from(self.bytes_remaining)))?;
+                .seek(SeekFrom::Current(i64::from(self.bytes_remaining + 4)))?;
             self.bytes_remaining = 0;
         }
         Ok(())
@@ -565,7 +579,7 @@ impl<'chunk, 'entry> Read for EntryChunk<'chunk, 'entry> {
 
 impl<'chunk, 'entry> Drop for EntryChunk<'chunk, 'entry> {
     fn drop(&mut self) {
-        self.skip_remaining_bytes()
+        self.skip_remaining_bytes_internal()
             .expect("error while skipping remaining bytes");
     }
 }

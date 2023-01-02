@@ -92,6 +92,7 @@ fn basic() {
     let wal = WriteAheadLog::recover(&dir, checkpointer.clone()).unwrap();
 
     let invocations = checkpointer.invocations.lock();
+    println!("Invocations: {:?}", invocations);
     assert_eq!(invocations.len(), 2);
     match &invocations[0] {
         CheckpointCall::ShouldRecoverSegment { version_info } => {
@@ -113,7 +114,7 @@ fn basic() {
     let mut buffer = Vec::new();
     reader.read_to_end(&mut buffer).unwrap();
     assert_eq!(buffer, message);
-    assert_eq!(reader.crc_is_valid(), Some(true));
+    assert!(reader.crc_is_valid().expect("error validating crc"));
 }
 
 #[derive(Debug, Default, Clone)]

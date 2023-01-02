@@ -129,7 +129,7 @@ impl WriteAheadLog {
                     Recovery::Recover => {
                         while let Some(mut entry) = reader.read_entry()? {
                             manager.recover(&mut entry)?;
-                            while let Some(mut chunk) = match entry.read_chunk()? {
+                            while let Some(chunk) = match entry.read_chunk()? {
                                 ReadChunkResult::Chunk(chunk) => Some(chunk),
                                 ReadChunkResult::EndOfEntry | ReadChunkResult::AbortedEntry => None,
                             } {
@@ -368,14 +368,13 @@ impl WriteAheadLog {
         )?;
         file.seek(SeekFrom::Start(position.offset))?;
         let mut reader = BufReader::new(file);
-        let mut header_bytes = [0; 9];
+        let mut header_bytes = [0; 5];
         reader.read_exact(&mut header_bytes)?;
-        let crc32 = u32::from_le_bytes(header_bytes[1..5].try_into().expect("u32 is 4 bytes"));
-        let length = u32::from_le_bytes(header_bytes[5..9].try_into().expect("u32 is 4 bytes"));
+        let length = u32::from_le_bytes(header_bytes[1..5].try_into().expect("u32 is 4 bytes"));
 
         Ok(ChunkReader {
             reader,
-            stored_crc32: crc32,
+            stored_crc32: None,
             length,
             bytes_remaining: length,
             read_crc32: 0,
@@ -438,7 +437,7 @@ pub struct ChunkReader {
     reader: BufReader<File>,
     bytes_remaining: u32,
     length: u32,
-    stored_crc32: u32,
+    stored_crc32: Option<u32>,
     read_crc32: u32,
 }
 
@@ -462,13 +461,23 @@ impl ChunkReader {
     /// Returns true if the stored checksum matches the computed checksum during
     /// read.
     ///
-    /// This function returns `None` if the chunk hasn't been read completely.
-    #[must_use]
-    pub const fn crc_is_valid(&self) -> Option<bool> {
+    /// This function will only return `Ok()` if the chunk has been fully read.
+    pub fn crc_is_valid(&mut self) -> io::Result<bool> {
         if self.bytes_remaining == 0 {
-            Some(self.stored_crc32 == self.read_crc32)
+            if self.stored_crc32.is_none() {
+                let mut stored_crc32 = [0; 4];
+                // Bypass our internal read, otherwise our crc would include the
+                // crc read itself.
+                self.reader.read_exact(&mut stored_crc32)?;
+                self.stored_crc32 = Some(u32::from_le_bytes(stored_crc32));
+            }
+
+            Ok(self.stored_crc32.expect("already initialized") == self.read_crc32)
         } else {
-            None
+            Err(io::Error::new(
+                io::ErrorKind::Other,
+                "crc cannot be checked before reading all chunk bytes",
+            ))
         }
     }
 }
