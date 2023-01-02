@@ -489,6 +489,15 @@
 <span id="489">489</span>
 <span id="490">490</span>
 <span id="491">491</span>
+<span id="492">492</span>
+<span id="493">493</span>
+<span id="494">494</span>
+<span id="495">495</span>
+<span id="496">496</span>
+<span id="497">497</span>
+<span id="498">498</span>
+<span id="499">499</span>
+<span id="500">500</span>
 </pre><pre class="rust"><code><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;.crate-docs.md&quot;</span>)]
 #![forbid(unsafe_code)]
 #![warn(
@@ -620,7 +629,7 @@
                     Recovery::Recover =&gt; {
                         <span class="kw">while let </span><span class="prelude-val">Some</span>(<span class="kw-2">mut </span>entry) = reader.read_entry()<span class="question-mark">? </span>{
                             manager.recover(<span class="kw-2">&amp;mut </span>entry)<span class="question-mark">?</span>;
-                            <span class="kw">while let </span><span class="prelude-val">Some</span>(<span class="kw-2">mut </span>chunk) = <span class="kw">match </span>entry.read_chunk()<span class="question-mark">? </span>{
+                            <span class="kw">while let </span><span class="prelude-val">Some</span>(chunk) = <span class="kw">match </span>entry.read_chunk()<span class="question-mark">? </span>{
                                 ReadChunkResult::Chunk(chunk) =&gt; <span class="prelude-val">Some</span>(chunk),
                                 ReadChunkResult::EndOfEntry | ReadChunkResult::AbortedEntry =&gt; <span class="prelude-val">None</span>,
                             } {
@@ -859,14 +868,13 @@
         )<span class="question-mark">?</span>;
         file.seek(SeekFrom::Start(position.offset))<span class="question-mark">?</span>;
         <span class="kw">let </span><span class="kw-2">mut </span>reader = BufReader::new(file);
-        <span class="kw">let </span><span class="kw-2">mut </span>header_bytes = [<span class="number">0</span>; <span class="number">9</span>];
+        <span class="kw">let </span><span class="kw-2">mut </span>header_bytes = [<span class="number">0</span>; <span class="number">5</span>];
         reader.read_exact(<span class="kw-2">&amp;mut </span>header_bytes)<span class="question-mark">?</span>;
-        <span class="kw">let </span>crc32 = u32::from_le_bytes(header_bytes[<span class="number">1</span>..<span class="number">5</span>].try_into().expect(<span class="string">&quot;u32 is 4 bytes&quot;</span>));
-        <span class="kw">let </span>length = u32::from_le_bytes(header_bytes[<span class="number">5</span>..<span class="number">9</span>].try_into().expect(<span class="string">&quot;u32 is 4 bytes&quot;</span>));
+        <span class="kw">let </span>length = u32::from_le_bytes(header_bytes[<span class="number">1</span>..<span class="number">5</span>].try_into().expect(<span class="string">&quot;u32 is 4 bytes&quot;</span>));
 
         <span class="prelude-val">Ok</span>(ChunkReader {
             reader,
-            stored_crc32: crc32,
+            stored_crc32: <span class="prelude-val">None</span>,
             length,
             bytes_remaining: length,
             read_crc32: <span class="number">0</span>,
@@ -929,7 +937,7 @@
     reader: BufReader&lt;File&gt;,
     bytes_remaining: u32,
     length: u32,
-    stored_crc32: u32,
+    stored_crc32: <span class="prelude-ty">Option</span>&lt;u32&gt;,
     read_crc32: u32,
 }
 
@@ -953,14 +961,24 @@
     <span class="doccomment">/// Returns true if the stored checksum matches the computed checksum during
     /// read.
     ///
-    /// This function returns `None` if the chunk hasn&#39;t been read completely.
-    </span><span class="attribute">#[must_use]
-    </span><span class="kw">pub const fn </span>crc_is_valid(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;bool&gt; {
+    /// This function will only return `Ok()` if the chunk has been fully read.
+    </span><span class="kw">pub fn </span>crc_is_valid(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; io::Result&lt;bool&gt; {
         <span class="kw">if </span><span class="self">self</span>.bytes_remaining == <span class="number">0 </span>{
-            <span class="prelude-val">Some</span>(<span class="self">self</span>.stored_crc32 == <span class="self">self</span>.read_crc32)
+            <span class="kw">if </span><span class="self">self</span>.stored_crc32.is_none() {
+                <span class="kw">let </span><span class="kw-2">mut </span>stored_crc32 = [<span class="number">0</span>; <span class="number">4</span>];
+                <span class="comment">// Bypass our internal read, otherwise our crc would include the
+                // crc read itself.
+                </span><span class="self">self</span>.reader.read_exact(<span class="kw-2">&amp;mut </span>stored_crc32)<span class="question-mark">?</span>;
+                <span class="self">self</span>.stored_crc32 = <span class="prelude-val">Some</span>(u32::from_le_bytes(stored_crc32));
+            }
+
+            <span class="prelude-val">Ok</span>(<span class="self">self</span>.stored_crc32.expect(<span class="string">&quot;already initialized&quot;</span>) == <span class="self">self</span>.read_crc32)
         } <span class="kw">else </span>{
-            <span class="prelude-val">None
-        </span>}
+            <span class="prelude-val">Err</span>(io::Error::new(
+                io::ErrorKind::Other,
+                <span class="string">&quot;crc cannot be checked before reading all chunk bytes&quot;</span>,
+            ))
+        }
     }
 }
 

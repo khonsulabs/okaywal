@@ -578,6 +578,20 @@
 <span id="578">578</span>
 <span id="579">579</span>
 <span id="580">580</span>
+<span id="581">581</span>
+<span id="582">582</span>
+<span id="583">583</span>
+<span id="584">584</span>
+<span id="585">585</span>
+<span id="586">586</span>
+<span id="587">587</span>
+<span id="588">588</span>
+<span id="589">589</span>
+<span id="590">590</span>
+<span id="591">591</span>
+<span id="592">592</span>
+<span id="593">593</span>
+<span id="594">594</span>
 </pre><pre class="rust"><code><span class="kw">use </span>std::{
     fs::{File, OpenOptions},
     io::{<span class="self">self</span>, BufRead, BufReader, ErrorKind, Read, Seek, SeekFrom, Write},
@@ -930,7 +944,7 @@
         <span class="kw">if let </span><span class="prelude-val">Some</span>(id) = <span class="self">self</span>.current_entry_id.take() {
             <span class="comment">// Skip the remainder of the current entry.
             </span><span class="kw">let </span><span class="kw-2">mut </span>entry = Entry { id, reader: <span class="self">self </span>};
-            <span class="kw">while let </span><span class="prelude-val">Some</span>(<span class="kw-2">mut </span>chunk) = <span class="kw">match </span>entry.read_chunk()<span class="question-mark">? </span>{
+            <span class="kw">while let </span><span class="prelude-val">Some</span>(chunk) = <span class="kw">match </span>entry.read_chunk()<span class="question-mark">? </span>{
                 ReadChunkResult::Chunk(chunk) =&gt; <span class="prelude-val">Some</span>(chunk),
                 <span class="kw">_ </span>=&gt; <span class="prelude-val">None</span>,
             } {
@@ -1000,7 +1014,7 @@
 
         <span class="kw">match </span><span class="self">self</span>.reader.file.buffer().first().copied() {
             <span class="prelude-val">Some</span>(CHUNK) =&gt; {
-                <span class="kw">let </span><span class="kw-2">mut </span>header_bytes = [<span class="number">0</span>; <span class="number">9</span>];
+                <span class="kw">let </span><span class="kw-2">mut </span>header_bytes = [<span class="number">0</span>; <span class="number">5</span>];
                 <span class="kw">let </span>offset = <span class="self">self</span>.reader.file.stream_position()<span class="question-mark">?</span>;
                 <span class="self">self</span>.reader.file.read_exact(<span class="kw-2">&amp;mut </span>header_bytes)<span class="question-mark">?</span>;
                 <span class="prelude-val">Ok</span>(ReadChunkResult::Chunk(EntryChunk {
@@ -1010,11 +1024,9 @@
                     },
                     entry: <span class="self">self</span>,
                     calculated_crc: <span class="number">0</span>,
-                    stored_crc: u32::from_le_bytes(
-                        header_bytes[<span class="number">1</span>..<span class="number">5</span>].try_into().expect(<span class="string">&quot;u32 is 4 bytes&quot;</span>),
-                    ),
+                    stored_crc32: <span class="prelude-val">None</span>,
                     bytes_remaining: u32::from_le_bytes(
-                        header_bytes[<span class="number">5</span>..].try_into().expect(<span class="string">&quot;u32 is 4 bytes&quot;</span>),
+                        header_bytes[<span class="number">1</span>..<span class="number">5</span>].try_into().expect(<span class="string">&quot;u32 is 4 bytes&quot;</span>),
                     ),
                 }))
             }
@@ -1078,8 +1090,8 @@
     entry: <span class="kw-2">&amp;</span><span class="lifetime">&#39;chunk </span><span class="kw-2">mut </span>Entry&lt;<span class="lifetime">&#39;entry</span>&gt;,
     position: LogPosition,
     bytes_remaining: u32,
-    stored_crc: u32,
     calculated_crc: u32,
+    stored_crc32: <span class="prelude-ty">Option</span>&lt;u32&gt;,
 }
 
 <span class="kw">impl</span>&lt;<span class="lifetime">&#39;chunk</span>, <span class="lifetime">&#39;entry</span>&gt; EntryChunk&lt;<span class="lifetime">&#39;chunk</span>, <span class="lifetime">&#39;entry</span>&gt; {
@@ -1096,14 +1108,24 @@
     }
 
     <span class="doccomment">/// Returns true if the CRC has been validated, or false if the computed crc
-    /// is different than the stored crc. Returns `None` if not all data has
-    /// been read yet.
-    </span><span class="attribute">#[must_use]
-    </span><span class="kw">pub const fn </span>check_crc(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;bool&gt; {
-        <span class="kw">if </span><span class="self">self</span>.bytes_remaining &gt; <span class="number">0 </span>{
-            <span class="prelude-val">None
-        </span>} <span class="kw">else </span>{
-            <span class="prelude-val">Some</span>(<span class="self">self</span>.stored_crc == <span class="self">self</span>.calculated_crc)
+    /// is different than the stored crc. Returns an error if the chunk has not
+    /// been fully read yet.
+    </span><span class="kw">pub fn </span>check_crc(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; io::Result&lt;bool&gt; {
+        <span class="kw">if </span><span class="self">self</span>.bytes_remaining == <span class="number">0 </span>{
+            <span class="kw">if </span><span class="self">self</span>.stored_crc32.is_none() {
+                <span class="kw">let </span><span class="kw-2">mut </span>stored_crc32 = [<span class="number">0</span>; <span class="number">4</span>];
+                <span class="comment">// Bypass our internal read, otherwise our crc would include the
+                // crc read itself.
+                </span><span class="self">self</span>.entry.reader.file.read_exact(<span class="kw-2">&amp;mut </span>stored_crc32)<span class="question-mark">?</span>;
+                <span class="self">self</span>.stored_crc32 = <span class="prelude-val">Some</span>(u32::from_le_bytes(stored_crc32));
+            }
+
+            <span class="prelude-val">Ok</span>(<span class="self">self</span>.stored_crc32.expect(<span class="string">&quot;already initialized&quot;</span>) == <span class="self">self</span>.calculated_crc)
+        } <span class="kw">else </span>{
+            <span class="prelude-val">Err</span>(io::Error::new(
+                io::ErrorKind::Other,
+                <span class="string">&quot;crc cannot be checked before reading all chunk bytes&quot;</span>,
+            ))
         }
     }
 
@@ -1115,12 +1137,18 @@
     }
 
     <span class="doccomment">/// Advances past the end of this chunk without reading the remaining bytes.
-    </span><span class="kw">pub fn </span>skip_remaining_bytes(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; io::Result&lt;()&gt; {
-        <span class="kw">if </span><span class="self">self</span>.bytes_remaining &gt; <span class="number">0 </span>{
-            <span class="self">self</span>.entry
+    </span><span class="kw">pub fn </span>skip_remaining_bytes(<span class="kw-2">mut </span><span class="self">self</span>) -&gt; io::Result&lt;()&gt; {
+        <span class="self">self</span>.skip_remaining_bytes_internal()
+    }
+
+    <span class="doccomment">/// Advances past the end of this chunk without reading the remaining bytes.
+    </span><span class="kw">fn </span>skip_remaining_bytes_internal(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; io::Result&lt;()&gt; {
+        <span class="kw">if </span><span class="self">self</span>.bytes_remaining &gt; <span class="number">0 </span>|| <span class="self">self</span>.stored_crc32.is_none() {
+            <span class="comment">// Skip past the remaining bytes plus the crc.
+            </span><span class="self">self</span>.entry
                 .reader
                 .file
-                .seek(SeekFrom::Current(i64::from(<span class="self">self</span>.bytes_remaining)))<span class="question-mark">?</span>;
+                .seek(SeekFrom::Current(i64::from(<span class="self">self</span>.bytes_remaining + <span class="number">4</span>)))<span class="question-mark">?</span>;
             <span class="self">self</span>.bytes_remaining = <span class="number">0</span>;
         }
         <span class="prelude-val">Ok</span>(())
@@ -1145,7 +1173,7 @@
 
 <span class="kw">impl</span>&lt;<span class="lifetime">&#39;chunk</span>, <span class="lifetime">&#39;entry</span>&gt; Drop <span class="kw">for </span>EntryChunk&lt;<span class="lifetime">&#39;chunk</span>, <span class="lifetime">&#39;entry</span>&gt; {
     <span class="kw">fn </span>drop(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
-        <span class="self">self</span>.skip_remaining_bytes()
+        <span class="self">self</span>.skip_remaining_bytes_internal()
             .expect(<span class="string">&quot;error while skipping remaining bytes&quot;</span>);
     }
 }
