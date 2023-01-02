@@ -592,6 +592,9 @@
 <span id="592">592</span>
 <span id="593">593</span>
 <span id="594">594</span>
+<span id="595">595</span>
+<span id="596">596</span>
+<span id="597">597</span>
 </pre><pre class="rust"><code><span class="kw">use </span>std::{
     fs::{File, OpenOptions},
     io::{<span class="self">self</span>, BufRead, BufReader, ErrorKind, Read, Seek, SeekFrom, Write},
@@ -647,17 +650,8 @@
 
     <span class="kw">pub fn </span>rename(<span class="kw-2">&amp;</span><span class="self">self</span>, new_name: <span class="kw-2">&amp;</span>str) -&gt; io::Result&lt;()&gt; {
         <span class="kw">let </span><span class="kw-2">mut </span>writer = <span class="self">self</span>.data.writer.lock();
-        <span class="kw">let </span>new_path = writer
-            .path
-            .parent()
-            .expect(<span class="string">&quot;parent path not found&quot;</span>)
-            .join(new_name);
-        std::fs::rename(<span class="kw-2">&amp;*</span>writer.path, <span class="kw-2">&amp;</span>new_path)<span class="question-mark">?</span>;
-        writer.path = Arc::new(new_path);
-
-        <span class="prelude-val">Ok</span>(())
+        writer.rename(new_name)
     }
-
     <span class="kw">pub fn </span>synchronize(<span class="kw-2">&amp;</span><span class="self">self</span>, target_synced_bytes: u64) -&gt; io::Result&lt;()&gt; {
         <span class="comment">// Flush the buffer to disk.
         </span><span class="kw">let </span>data = <span class="self">self</span>.lock();
@@ -831,6 +825,18 @@
             <span class="self">Self</span>::write_header(<span class="kw-2">&amp;mut </span><span class="self">self</span>.file, <span class="kw-2">&amp;</span><span class="self">self</span>.version_info, <span class="bool-val">true</span>)<span class="question-mark">?</span>;
             <span class="self">self</span>.last_entry_id = <span class="prelude-val">None</span>;
         }
+
+        <span class="prelude-val">Ok</span>(())
+    }
+
+    <span class="kw">pub fn </span>rename(<span class="kw-2">&amp;mut </span><span class="self">self</span>, new_name: <span class="kw-2">&amp;</span>str) -&gt; io::Result&lt;()&gt; {
+        <span class="kw">let </span>new_path = <span class="self">self
+            </span>.path
+            .parent()
+            .expect(<span class="string">&quot;parent path not found&quot;</span>)
+            .join(new_name);
+        std::fs::rename(<span class="kw-2">&amp;*</span><span class="self">self</span>.path, <span class="kw-2">&amp;</span>new_path)<span class="question-mark">?</span>;
+        <span class="self">self</span>.path = Arc::new(new_path);
 
         <span class="prelude-val">Ok</span>(())
     }

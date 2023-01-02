@@ -498,6 +498,41 @@
 <span id="498">498</span>
 <span id="499">499</span>
 <span id="500">500</span>
+<span id="501">501</span>
+<span id="502">502</span>
+<span id="503">503</span>
+<span id="504">504</span>
+<span id="505">505</span>
+<span id="506">506</span>
+<span id="507">507</span>
+<span id="508">508</span>
+<span id="509">509</span>
+<span id="510">510</span>
+<span id="511">511</span>
+<span id="512">512</span>
+<span id="513">513</span>
+<span id="514">514</span>
+<span id="515">515</span>
+<span id="516">516</span>
+<span id="517">517</span>
+<span id="518">518</span>
+<span id="519">519</span>
+<span id="520">520</span>
+<span id="521">521</span>
+<span id="522">522</span>
+<span id="523">523</span>
+<span id="524">524</span>
+<span id="525">525</span>
+<span id="526">526</span>
+<span id="527">527</span>
+<span id="528">528</span>
+<span id="529">529</span>
+<span id="530">530</span>
+<span id="531">531</span>
+<span id="532">532</span>
+<span id="533">533</span>
+<span id="534">534</span>
+<span id="535">535</span>
 </pre><pre class="rust"><code><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;.crate-docs.md&quot;</span>)]
 #![forbid(unsafe_code)]
 #![warn(
@@ -514,7 +549,7 @@
 )]
 
 </span><span class="kw">use </span>std::{
-    collections::VecDeque,
+    collections::{HashMap, VecDeque},
     fs::{<span class="self">self</span>, File},
     io::{<span class="self">self</span>, BufReader, ErrorKind, Read, Seek, SeekFrom},
     path::Path,
@@ -570,6 +605,8 @@
     config: Configuration,
     checkpoint_sender: flume::Sender&lt;LogFile&gt;,
     checkpoint_thread: Mutex&lt;<span class="prelude-ty">Option</span>&lt;JoinHandle&lt;io::Result&lt;()&gt;&gt;&gt;&gt;,
+    readers: Mutex&lt;HashMap&lt;u64, usize&gt;&gt;,
+    readers_sync: Condvar,
 }
 
 <span class="attribute">#[derive(Debug, Default)]
@@ -670,6 +707,8 @@
                 config,
                 checkpoint_sender,
                 checkpoint_thread: Mutex::new(<span class="prelude-val">None</span>),
+                readers: Mutex::default(),
+                readers_sync: Condvar::new(),
             }),
         };
 
@@ -794,7 +833,7 @@
                 manager.checkpoint_to(entry_id, <span class="kw-2">&amp;mut </span>reader)<span class="question-mark">?</span>;
             }
 
-            <span class="comment">// Prepare the writer to be recycled.
+            <span class="comment">// Rename the file to denote that it&#39;s been checkpointed.
             </span><span class="kw">let </span>new_name = <span class="macro">format!</span>(
                 <span class="string">&quot;{}-cp&quot;</span>,
                 writer
@@ -804,10 +843,23 @@
                     .to_str()
                     .expect(<span class="string">&quot;should be ascii&quot;</span>)
             );
-            writer.revert_to(<span class="number">0</span>)<span class="question-mark">?</span>;
+            writer.rename(<span class="kw-2">&amp;</span>new_name)<span class="question-mark">?</span>;
+
+            <span class="comment">// Now, read attemps will fail, but any current readers are still
+            // able to read the data. Before we truncate the file, we need to
+            // wait for all existing readers to close.
+            </span><span class="kw">let </span><span class="kw-2">mut </span>readers = wal.data.readers.lock();
+            <span class="kw">while </span>readers.get(<span class="kw-2">&amp;</span>writer.id()).copied().unwrap_or(<span class="number">0</span>) &gt; <span class="number">0 </span>{
+                wal.data.readers_sync.wait(<span class="kw-2">&amp;mut </span>readers);
+            }
+            readers.remove(<span class="kw-2">&amp;</span>writer.id());
+            drop(readers);
+
+            <span class="comment">// Now that there are no readers, we can safely prepare the file for
+            // reuse.
+            </span>writer.revert_to(<span class="number">0</span>)<span class="question-mark">?</span>;
             drop(writer);
 
-            file_to_checkpoint.rename(<span class="kw-2">&amp;</span>new_name)<span class="question-mark">?</span>;
             <span class="kw">let </span>sync_target = Instant::now();
 
             <span class="kw">let </span>files = wal.data.files.lock();
@@ -856,11 +908,8 @@
     ///
     /// - The file cannot be read.
     /// - The position refers to data that has been checkpointed.
-    </span><span class="kw">pub fn </span>read_at(<span class="kw-2">&amp;</span><span class="self">self</span>, position: LogPosition) -&gt; io::Result&lt;ChunkReader&gt; {
-        <span class="comment">// TODO we should keep track of how many readers we have open for a
-        // given wal file to prevent the truncation operation in a checkpoint if
-        // a reader is still open.
-        </span><span class="kw">let </span><span class="kw-2">mut </span>file = File::open(
+    </span><span class="kw">pub fn </span>read_at(<span class="kw-2">&amp;</span><span class="self">self</span>, position: LogPosition) -&gt; io::Result&lt;ChunkReader&lt;<span class="lifetime">&#39;_</span>&gt;&gt; {
+        <span class="kw">let </span><span class="kw-2">mut </span>file = File::open(
             <span class="self">self</span>.data
                 .config
                 .directory
@@ -872,7 +921,14 @@
         reader.read_exact(<span class="kw-2">&amp;mut </span>header_bytes)<span class="question-mark">?</span>;
         <span class="kw">let </span>length = u32::from_le_bytes(header_bytes[<span class="number">1</span>..<span class="number">5</span>].try_into().expect(<span class="string">&quot;u32 is 4 bytes&quot;</span>));
 
+        <span class="kw">let </span><span class="kw-2">mut </span>readers = <span class="self">self</span>.data.readers.lock();
+        <span class="kw">let </span>file_readers = readers.entry(position.file_id).or_default();
+        <span class="kw-2">*</span>file_readers += <span class="number">1</span>;
+        drop(readers);
+
         <span class="prelude-val">Ok</span>(ChunkReader {
+            wal: <span class="self">self</span>,
+            file_id: position.file_id,
             reader,
             stored_crc32: <span class="prelude-val">None</span>,
             length,
@@ -933,7 +989,9 @@
 /// This reader will stop returning bytes after reading all bytes previously
 /// written.
 </span><span class="attribute">#[derive(Debug)]
-</span><span class="kw">pub struct </span>ChunkReader {
+</span><span class="kw">pub struct </span>ChunkReader&lt;<span class="lifetime">&#39;a</span>&gt; {
+    wal: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>WriteAheadLog,
+    file_id: u64,
     reader: BufReader&lt;File&gt;,
     bytes_remaining: u32,
     length: u32,
@@ -941,7 +999,7 @@
     read_crc32: u32,
 }
 
-<span class="kw">impl </span>ChunkReader {
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; ChunkReader&lt;<span class="lifetime">&#39;a</span>&gt; {
     <span class="doccomment">/// Returns the length of the data stored.
     ///
     /// This value will not change as data is read.
@@ -982,7 +1040,7 @@
     }
 }
 
-<span class="kw">impl </span>Read <span class="kw">for </span>ChunkReader {
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; Read <span class="kw">for </span>ChunkReader&lt;<span class="lifetime">&#39;a</span>&gt; {
     <span class="kw">fn </span>read(<span class="kw-2">&amp;mut </span><span class="self">self</span>, <span class="kw-2">mut </span>buf: <span class="kw-2">&amp;mut </span>[u8]) -&gt; io::Result&lt;usize&gt; {
         <span class="kw">let </span>bytes_remaining =
             usize::try_from(<span class="self">self</span>.bytes_remaining).expect(<span class="string">&quot;too large for platform&quot;</span>);
@@ -993,6 +1051,18 @@
         <span class="self">self</span>.read_crc32 = crc32c::crc32c_append(<span class="self">self</span>.read_crc32, <span class="kw-2">&amp;</span>buf[..bytes_read]);
         <span class="self">self</span>.bytes_remaining -= u32::try_from(bytes_read).expect(<span class="string">&quot;can&#39;t be larger than buf.len()&quot;</span>);
         <span class="prelude-val">Ok</span>(bytes_read)
+    }
+}
+
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; Drop <span class="kw">for </span>ChunkReader&lt;<span class="lifetime">&#39;a</span>&gt; {
+    <span class="kw">fn </span>drop(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="kw">let </span><span class="kw-2">mut </span>readers = <span class="self">self</span>.wal.data.readers.lock();
+        <span class="kw">let </span>file_readers = readers
+            .get_mut(<span class="kw-2">&amp;</span><span class="self">self</span>.file_id)
+            .expect(<span class="string">&quot;reader entry not present&quot;</span>);
+        <span class="kw-2">*</span>file_readers -= <span class="number">1</span>;
+        drop(readers);
+        <span class="self">self</span>.wal.data.readers_sync.notify_one();
     }
 }
 
