@@ -14,7 +14,7 @@ considered unstable.**
 [![crate version](https://img.shields.io/crates/v/okaywal.svg)](https://crates.io/crates/okaywal)
 [![Live Build Status](https://img.shields.io/github/workflow/status/khonsulabs/okaywal/Tests/main)](https://github.com/khonsulabs/okaywal/actions?query=workflow:Tests)
 [![HTML Coverage Report for `main` branch](https://khonsulabs.github.io/okaywal/coverage/badge.svg)](https://khonsulabs.github.io/okaywal/coverage/)
-[![Documentation](https://img.shields.io/badge/docs-main-informational)](https://khonsulabs.github.io/okaywal/main/okaywal)
+[![Documentation](https://img.shields.io/badge/docs-main-informational)](https://docs.rs/okaywal)
 
 This crate exposes a WAL that supports:
 
@@ -26,9 +26,9 @@ This crate exposes a WAL that supports:
 
 ## Basic How-To
 
-[`WriteAheadLog::recover()`](https://khonsulabs.github.io/okaywal/main/okaywal/struct.WriteAheadLog.html#method.recover) is used to create or recover a WAL
+[`WriteAheadLog::recover()`](https://docs.rs/okaywal/*/okaywal/struct.WriteAheadLog.html#method.recover) is used to create or recover a WAL
 in a given directory. To open a log, an implementator of
-[`LogManager`](https://khonsulabs.github.io/okaywal/main/okaywal/trait.LogManager.html) must be provided. This trait is how
+[`LogManager`](https://docs.rs/okaywal/*/okaywal/trait.LogManager.html) must be provided. This trait is how
 OkayWAL communicates with your code when recovering or checkpointing a log.
 
 The [basic example][basic-example] shows this process with many comments
@@ -197,7 +197,7 @@ Finally, a four-byte crc32 ends the chunk.
 If a reader does not encounter a new chunk marker (2) or an end-of-entry marker
 (3), the entry should be considered abandoned and all chunks should be ignored.
 
-[basic-example]: https://github.com/khonsulabs/okaywal/blob/main/examples/basic.rs
+[basic-example]: https://github.com/khonsulabs/okaywal/blob/v0.1.0/examples/basic.rs
 [wal]: https://en.wikipedia.org/wiki/Write-ahead_logging
 
 ## Open-source Licenses
