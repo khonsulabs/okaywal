@@ -718,7 +718,7 @@
             }),
         };
 
-        <span class="kw">for </span>file_to_checkpoint <span class="kw">in </span>files_to_checkpoint.into_iter().rev() {
+        <span class="kw">for </span>file_to_checkpoint <span class="kw">in </span>files_to_checkpoint {
             wal.data
                 .checkpoint_sender
                 .send(file_to_checkpoint)

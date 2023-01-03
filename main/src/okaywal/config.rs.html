@@ -111,7 +111,7 @@
 <span class="kw">use crate</span>::{LogManager, WriteAheadLog};
 
 <span class="doccomment">/// A [`WriteAheadLog`] configuration.
-</span><span class="attribute">#[derive(Debug)]
+</span><span class="attribute">#[derive(Debug, Clone)]
 #[must_use]
 </span><span class="kw">pub struct </span>Configuration {
     <span class="doccomment">/// The directory to store the log files in.

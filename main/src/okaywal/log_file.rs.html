@@ -595,6 +595,7 @@
 <span id="595">595</span>
 <span id="596">596</span>
 <span id="597">597</span>
+<span id="598">598</span>
 </pre><pre class="rust"><code><span class="kw">use </span>std::{
     fs::{File, OpenOptions},
     io::{<span class="self">self</span>, BufRead, BufReader, ErrorKind, Read, Seek, SeekFrom, Write},
@@ -936,6 +937,7 @@
             <span class="kw">if </span><span class="self">self</span>.first_entry_id.is_none() {
                 <span class="self">self</span>.first_entry_id = <span class="self">self</span>.current_entry_id;
             }
+            <span class="self">self</span>.last_entry_id = <span class="self">self</span>.current_entry_id;
 
             <span class="prelude-val">Ok</span>(<span class="bool-val">true</span>)
         } <span class="kw">else </span>{

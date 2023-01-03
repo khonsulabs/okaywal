@@ -444,7 +444,7 @@
 
 <span class="doccomment">/// The unique id of an entry written to a [`WriteAheadLog`]. These IDs are
 /// ordered by the time the [`EntryWriter`] was created for the entry written with this id.
-</span><span class="attribute">#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Copy, Clone, Default)]
+</span><span class="attribute">#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Copy, Clone, Default, Hash)]
 </span><span class="kw">pub struct </span>EntryId(<span class="kw">pub </span>u64);
 </code></pre></div>
 </section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="okaywal" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.66.0 (69f9c33d7 2022-12-12)" ></div></body></html>
