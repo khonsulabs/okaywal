@@ -262,10 +262,10 @@ fn aborted_entry() {
 fn always_checkpointing() {
     let dir = tempdir().unwrap();
     let checkpointer = LoggingCheckpointer::default();
-    let config = Configuration::default_for(&dir).checkpoint_after_bytes(1);
+    let config = Configuration::default_for(&dir).checkpoint_after_bytes(33);
 
     let mut written_chunks = Vec::new();
-    for i in 0_usize..10 {
+    for i in 0_usize..100 {
         println!("About to insert {i}");
         let wal = config.clone().open(checkpointer.clone()).unwrap();
         let mut writer = wal.begin_entry().unwrap();

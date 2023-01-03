@@ -164,7 +164,7 @@ impl LogFileWriter {
         let mut file = Buffered::with_capacity(file, config.buffer_bytes)?;
 
         if validated_length == 0 {
-            Self::write_header(&mut file, &config.version_info, false)?;
+            Self::write_header(&mut file, &config.version_info)?;
             file.flush()?;
         }
 
@@ -179,20 +179,11 @@ impl LogFileWriter {
         })
     }
 
-    fn write_header(
-        file: &mut Buffered<File>,
-        version_info: &[u8],
-        is_overwrite: bool,
-    ) -> io::Result<()> {
+    fn write_header(file: &mut Buffered<File>, version_info: &[u8]) -> io::Result<()> {
         file.write_all(b"okw\0")?;
         let version_size = u8::try_from(version_info.len()).to_io()?;
         file.write_all(&[version_size])?;
         file.write_all(version_info)?;
-        if is_overwrite {
-            file.write_all(b"\0")?;
-            file.flush()?;
-            file.seek(SeekFrom::Current(-1))?;
-        }
         Ok(())
     }
 
@@ -225,7 +216,7 @@ impl LogFileWriter {
             self.synchronized_through = length;
         }
         if self.synchronized_through == 0 {
-            Self::write_header(&mut self.file, &self.version_info, true)?;
+            Self::write_header(&mut self.file, &self.version_info)?;
             self.last_entry_id = None;
         }
 
@@ -333,19 +324,20 @@ impl SegmentReader {
         }
 
         if let NEW_ENTRY = header_bytes[0] {
-            self.current_entry_id = Some(EntryId(u64::from_le_bytes(
-                header_bytes[1..].try_into().unwrap(),
-            )));
-            if self.first_entry_id.is_none() {
-                self.first_entry_id = self.current_entry_id;
-            }
-            self.last_entry_id = self.current_entry_id;
+            let read_id = EntryId(u64::from_le_bytes(header_bytes[1..].try_into().unwrap()));
+            if read_id.0 >= self.file_id {
+                self.current_entry_id = Some(read_id);
+                if self.first_entry_id.is_none() {
+                    self.first_entry_id = self.current_entry_id;
+                }
+                self.last_entry_id = self.current_entry_id;
 
-            Ok(true)
-        } else {
-            self.current_entry_id = None;
-            Ok(false)
+                return Ok(true);
+            }
         }
+
+        self.current_entry_id = None;
+        Ok(false)
     }
 
     /// Reads an entry from the log. If no more entries are found, None is
