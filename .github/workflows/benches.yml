@@ -4,6 +4,21 @@ on: [push]
 
 jobs:
   benchmark:
+    services:
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_DB: bench
+          POSTGRES_USER: bencher
+          POSTGRES_PASSWORD: password
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -14,8 +29,8 @@ jobs:
 
       - name: Build benchmarks
         run: |
-          cargo bench -p benchmarks --no-run
+          cargo bench -p benchmarks --all-features --no-run
 
       - name: Run benchmarks
         run: |
-          cargo bench -p benchmarks 
+          cargo bench -p benchmarks --all-features
