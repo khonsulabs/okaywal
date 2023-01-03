@@ -30,6 +30,9 @@ fn main() {
     #[cfg(feature = "sharded-log")]
     let bench = bench.with::<shardedlog::ShardedLog>();
 
+    #[cfg(feature = "postgres")]
+    let bench = bench.with::<postgres::Postgres>();
+
     bench.run(&measurements).unwrap();
 
     let stats = measurements.wait_for_stats();
@@ -147,6 +150,76 @@ mod shardedlog {
                 let measurement = measurements.begin(metric.clone());
                 self.log.write_batch(&[&data]).unwrap();
                 self.log.flush().unwrap();
+                measurement.finish();
+            }
+            Ok(())
+        }
+    }
+}
+
+#[cfg(feature = "postgres")]
+mod postgres {
+    use ::postgres::NoTls;
+
+    use super::*;
+
+    #[derive(Clone, Debug)]
+    pub struct Postgres {
+        config: InsertConfig,
+        pg_config: ::postgres::Config,
+    }
+
+    impl BenchmarkImplementation<Label, InsertConfig, Infallible> for Postgres {
+        type SharedConfig = Self;
+
+        fn label(number_of_threads: usize, _config: &InsertConfig) -> Label {
+            Label::from(format!("postgres-{:02}t", number_of_threads))
+        }
+
+        fn initialize_shared_config(
+            _number_of_threads: usize,
+            config: &InsertConfig,
+        ) -> Result<Self::SharedConfig, Infallible> {
+            let mut pg_config = ::postgres::Config::new();
+            pg_config
+                .dbname("bench")
+                .host("localhost")
+                .user("bencher")
+                .password("password");
+            let mut client = pg_config.connect(NoTls).unwrap();
+            client
+                .execute("DROP TABLE IF EXISTS okaywal_inserts;", &[])
+                .unwrap();
+            client
+                .execute("CREATE TABLE okaywal_inserts(data bytea);", &[])
+                .unwrap();
+            Ok(Self {
+                config: *config,
+                pg_config,
+            })
+        }
+
+        fn reset(_shutting_down: bool) -> Result<(), Infallible> {
+            Ok(())
+        }
+
+        fn initialize(
+            _number_of_threads: usize,
+            config: Self::SharedConfig,
+        ) -> Result<Self, Infallible> {
+            Ok(config)
+        }
+
+        fn measure(&mut self, measurements: &LabeledTimings<Label>) -> Result<(), Infallible> {
+            let mut client = self.pg_config.connect(NoTls).unwrap();
+            let metric = Label::from(format!("commit-{}", Bytes(self.config.number_of_bytes)));
+            let data = vec![42_u8; self.config.number_of_bytes];
+            for _ in 0..self.config.iters {
+                let measurement = measurements.begin(metric.clone());
+                client
+                    .execute("INSERT INTO okaywal_inserts (data) values ($1)", &[&data])
+                    .unwrap();
+
                 measurement.finish();
             }
             Ok(())
