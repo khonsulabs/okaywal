@@ -220,5 +220,5 @@ pub struct ChunkRecord {
 
 /// The unique id of an entry written to a [`WriteAheadLog`]. These IDs are
 /// ordered by the time the [`EntryWriter`] was created for the entry written with this id.
-#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Copy, Clone, Default)]
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Copy, Clone, Default, Hash)]
 pub struct EntryId(pub u64);

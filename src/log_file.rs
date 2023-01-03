@@ -339,6 +339,7 @@ impl SegmentReader {
             if self.first_entry_id.is_none() {
                 self.first_entry_id = self.current_entry_id;
             }
+            self.last_entry_id = self.current_entry_id;
 
             Ok(true)
         } else {

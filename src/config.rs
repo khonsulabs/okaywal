@@ -8,7 +8,7 @@ use std::{
 use crate::{LogManager, WriteAheadLog};
 
 /// A [`WriteAheadLog`] configuration.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[must_use]
 pub struct Configuration {
     /// The directory to store the log files in.

@@ -180,7 +180,7 @@ impl WriteAheadLog {
             }),
         };
 
-        for file_to_checkpoint in files_to_checkpoint.into_iter().rev() {
+        for file_to_checkpoint in files_to_checkpoint {
             wal.data
                 .checkpoint_sender
                 .send(file_to_checkpoint)

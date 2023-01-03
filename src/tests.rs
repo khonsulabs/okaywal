@@ -1,16 +1,17 @@
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashMap},
     io::{Read, Write},
     iter::repeat_with,
     sync::Arc,
+    time::Duration,
 };
 
 use parking_lot::Mutex;
 use tempfile::tempdir;
 
 use crate::{
-    entry::NEW_ENTRY, Entry, EntryId, LogManager, RecoveredSegment, Recovery, SegmentReader,
-    WriteAheadLog,
+    entry::NEW_ENTRY, Configuration, Entry, EntryId, LogManager, RecoveredSegment, Recovery,
+    SegmentReader, WriteAheadLog,
 };
 
 #[derive(Default, Debug, Clone)]
@@ -28,7 +29,7 @@ enum CheckpointCall {
         data: Vec<Vec<u8>>,
     },
     Checkpoint {
-        last_checkpointed_id: EntryId,
+        data: HashMap<EntryId, Vec<Vec<u8>>>,
     },
 }
 
@@ -43,7 +44,7 @@ impl LogManager for LoggingCheckpointer {
     }
 
     fn recover(&mut self, entry: &mut Entry<'_>) -> std::io::Result<()> {
-        let entry_id = dbg!(entry.id);
+        let entry_id = entry.id;
 
         if let Some(chunks) = entry.read_all_chunks()? {
             let mut invocations = self.invocations.lock();
@@ -58,13 +59,17 @@ impl LogManager for LoggingCheckpointer {
 
     fn checkpoint_to(
         &mut self,
-        last_checkpointed_id: EntryId,
-        _entries: &mut SegmentReader,
+        _last_checkpointed_id: EntryId,
+        entries: &mut SegmentReader,
     ) -> std::io::Result<()> {
         let mut invocations = self.invocations.lock();
-        invocations.push(CheckpointCall::Checkpoint {
-            last_checkpointed_id,
-        });
+        let mut data = HashMap::new();
+        while let Some(mut entry) = entries.read_entry()? {
+            if let Some(entry_chunks) = entry.read_all_chunks()? {
+                data.insert(entry.id(), entry_chunks);
+            }
+        }
+        invocations.push(CheckpointCall::Checkpoint { data });
 
         Ok(())
     }
@@ -251,4 +256,50 @@ fn aborted_entry() {
         other => unreachable!("unexpected invocation: {other:?}"),
     }
     drop(invocations);
+}
+
+#[test]
+fn always_checkpointing() {
+    let dir = tempdir().unwrap();
+    let checkpointer = LoggingCheckpointer::default();
+    let config = Configuration::default_for(&dir).checkpoint_after_bytes(1);
+
+    let mut written_chunks = Vec::new();
+    for i in 0_usize..10 {
+        println!("About to insert {i}");
+        let wal = config.clone().open(checkpointer.clone()).unwrap();
+        let mut writer = wal.begin_entry().unwrap();
+        println!("Writing {i}");
+        let record = writer.write_chunk(&i.to_be_bytes()).unwrap();
+        let written_entry_id = writer.commit().unwrap();
+        println!("{i} written to {record:?} in {written_entry_id:?}");
+        written_chunks.push((written_entry_id, record));
+        wal.shutdown().unwrap();
+    }
+
+    // Because we write and close the database so quickly, it's possible for the
+    // final write to not have been checkpointed by the background thread. So,
+    // we'll reopen the WAL one more time and sleep for a moment to allow it to
+    // finish.
+    let _wal = config.open(checkpointer.clone()).unwrap();
+    std::thread::sleep(Duration::from_millis(100));
+
+    let invocations = checkpointer.invocations.lock();
+    println!("Invocations: {:?}", invocations);
+
+    for (index, (entry_id, _)) in written_chunks.into_iter().enumerate() {
+        println!("Checking {index}");
+        let chunk_data = invocations
+            .iter()
+            .find_map(|call| {
+                if let CheckpointCall::Checkpoint { data, .. } = call {
+                    data.get(&entry_id)
+                } else {
+                    None
+                }
+            })
+            .expect("entry not checkpointed");
+
+        assert_eq!(chunk_data[0], index.to_be_bytes());
+    }
 }
