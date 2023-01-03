@@ -83,7 +83,8 @@ where
             let bytes_to_copy =
                 (self.buffer.len() - self.buffer_write_position).min(bytes_to_write);
             if bytes_to_copy > 0 {
-                self.buffer[self.buffer_write_position..].copy_from_slice(&buf[..bytes_to_copy]);
+                self.buffer[self.buffer_write_position..self.buffer_write_position + bytes_to_copy]
+                    .copy_from_slice(&buf[..bytes_to_copy]);
             }
             let bytes_to_extend = bytes_to_write - bytes_to_copy;
             if bytes_to_extend > 0 {
@@ -108,6 +109,7 @@ where
     F: Bufferable + Seek + Write,
 {
     fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
+        let buffer_write_position = u64::try_from(self.buffer_write_position).to_io()?;
         let new_position = match pos {
             SeekFrom::Start(position) => position,
             SeekFrom::End(offset) => {
@@ -120,11 +122,11 @@ where
             }
             SeekFrom::Current(offset) => {
                 if let Ok(offset) = u64::try_from(offset) {
-                    self.position + u64::try_from(self.buffer_write_position).to_io()? + offset
+                    self.position + buffer_write_position + offset
                 } else {
                     let absolute_offset = -offset;
                     let offset = u64::try_from(absolute_offset).unwrap();
-                    self.position + u64::try_from(self.buffer_write_position).to_io()? - offset
+                    self.position + buffer_write_position - offset
                 }
             }
         };

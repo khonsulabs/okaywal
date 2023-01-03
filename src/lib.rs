@@ -121,6 +121,9 @@ impl WriteAheadLog {
         let mut files = Files::default();
         let mut files_to_checkpoint = Vec::new();
         for (entry_id, path, has_checkpointed) in discovered_files {
+            // We can safely assume that the entry id prior to the one that
+            // labels the file have been used.
+            files.last_entry_id = EntryId(entry_id - 1);
             if has_checkpointed {
                 files
                     .inactive
