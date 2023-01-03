@@ -2,10 +2,11 @@
 <blockquote>
 <p>There’s The Great Wall, and then there’s this: an okay WAL.</p>
 </blockquote>
-<p><strong>WARNING: This crate is early in development. Please do not use in any projects
-until this has been incorporated into
+<p><strong>WARNING: This crate is early in development. Please do not use in any
+production projects until this has been incorporated into
 <a href="https://github.com/khonsulabs/sediment">Sediment</a> and shipping as part of
-<a href="https://github.com/khonsulabs/nebari">Nebari</a>.</strong></p>
+<a href="https://github.com/khonsulabs/nebari">Nebari</a>. The file format is currently
+considered unstable.</strong></p>
 <p><img src="https://img.shields.io/badge/unsafe-forbid-success" alt="okaywal forbids unsafe code" />
 <a href="https://crates.io/crates/okaywal"><img src="https://img.shields.io/crates/v/okaywal.svg" alt="crate version" /></a>
 <a href="https://github.com/khonsulabs/okaywal/actions?query=workflow:Tests"><img src="https://img.shields.io/github/workflow/status/khonsulabs/okaywal/Tests/main" alt="Live Build Status" /></a>
@@ -81,6 +82,75 @@ multiple writes.</p>
 durable write of a given size to the log file. Despite using a single-file
 approach, we are able to keep average write times very low even with a large
 number of simultaneous writers.</p>
+<h3 id="how-okaywal-works"><a href="#how-okaywal-works">How OkayWAL works</a></h3>
+<p>OkayWAL streams incoming data into “segments”. Each segment file is named with
+the format <code>wal-{id}</code>. The id of a segment file refers to the first <code>EntryId</code>
+that could appear within the segment file.</p>
+<p>Segment files are pre-allocated to the length configured in
+<code>Configuration::preallocate_bytes</code>. Preallocating files is critical for
+performance, as overwriting existing bytes in general is less expensive than
+allocating new bytes on disk.</p>
+<p>OkayWAL always has a current segment file. When a new entry is written, it
+always goes to the current segment file. When an entry is completed, the length
+of the segment file is checked against <code>Configuration::checkpoint_after_bytes</code>.
+If enough data has been written to trigger a checkpoint, the file is sent to the
+checkpointing thread and a new segment file is activated.</p>
+<p>Regardless of whether the file is checkpointed, before control returns from
+committing an entry, the file is <code>fsync</code>ed. <code>fsync</code> operations are batched,
+allowing multiple entries to be written by separate threads during the same
+<code>fsync</code> operation.</p>
+<p>OkayWAL also keeps track of any time a new file is created or a file is renamed.
+As needed, the directory containing the write-ahead logs is also <code>fsync</code>ed to
+ensure necessary file and directory metadata is fully synchronized. Just like
+file <code>fsync</code> batching, OkayWAL also automatically batches directory <code>fsync</code>s
+across threads.</p>
+<h4 id="checkpointing-a-segment-file-background-thread"><a href="#checkpointing-a-segment-file-background-thread">Checkpointing a segment file (Background Thread)</a></h4>
+<p>The checkpointing thread holds a weak reference to the <code>WriteAheadLog</code> data.
+When a file is received by the thread to checkpoint, it will upgrade the weak
+reference. If it cannot, the checkpointing thread shuts down gracefully and the
+recovery process will send the file again for checkpointing the next time the
+log is opened.</p>
+<p>The thread invokes <code>LogManager::checkpoint_to</code> for the file, allowing the
+<code>LogManager</code> to make any needed changes to persist the data stored in the
+segment being checkpointed.</p>
+<p>After the <code>LogManager</code> finishes, the file is renamed to include <code>-cp</code> as its
+suffix. Until this step, readers are able to be opened against data stored in
+the file being checkpointed. Once the file is renamed, new readers will begin
+returning not found errors.</p>
+<p>After the file is renamed, the checkpointer waits for all outstanding readers to
+finish reading data. The file is then finally recycled by moving it to the
+inactive files list.</p>
+<h4 id="activating-a-new-segment-file"><a href="#activating-a-new-segment-file">Activating a new segment file</a></h4>
+<p>If there are any files in the inactive files list, one is reused. Otherwise, a
+new file is created and filled with 0’s to the configured preallocation length.</p>
+<p>The file’s name is set to <code>wal-{next EntryId}</code>. For example, a brand new
+write-ahead log’s first segment file will be named <code>wal-1</code>, and the first
+<code>EntryId</code> written will be <code>1</code>.</p>
+<h4 id="segment-file-format"><a href="#segment-file-format">Segment File Format</a></h4>
+<p>Each segment file starts with this header:</p>
+<ul>
+<li><code>okw</code>: Three byte magic code</li>
+<li>OkayWAL Version: Single byte version number. Currently 0.</li>
+<li><code>Configuration::version_info</code> length: Single byte. The embedded information
+must be 255 or less bytes long.</li>
+<li>Embedded Version Info: The bytes of the version info. The previous byte
+controls how many bytes long this field is.</li>
+</ul>
+<p>After this header, the file is a series of entries, each which contain a series
+of chunks. A byte with a value of 1 signifies a new entry. Any other byte causes
+the reader to stop reading entries from the file.</p>
+<p>The first 8 bytes of the entry is the little-endian representation of its
+<code>EntryId</code>.</p>
+<p>After the <code>EntryId</code>, a series of chunks is expected. A byte with a value of 2
+signals that a chunk is next in the file. A byte with a value of 3 signals that
+this is the end of the current entry being written. Any other byte causes the
+<code>SegmentReader</code> to return an AbortedEntry result. Any already-read chunks from
+this entry should be ignored/rolled back by the <code>LogManager</code>.</p>
+<p>The first four bytes of a chunk is the data length in little-endian
+representation. The data for the chunk follows.</p>
+<p>Finally, a four-byte crc32 ends the chunk.</p>
+<p>If a reader does not encounter a new chunk marker (2) or an end-of-entry marker
+(3), the entry should be considered abandoned and all chunks should be ignored.</p>
 </div></details><h2 id="structs" class="small-section-header"><a href="#structs">Structs</a></h2><div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.ChunkReader.html" title="okaywal::ChunkReader struct">ChunkReader</a></div><div class="item-right docblock-short">A buffered reader for a previously written data chunk.</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.ChunkRecord.html" title="okaywal::ChunkRecord struct">ChunkRecord</a></div><div class="item-right docblock-short">A record of a chunk that was written to a <a href="struct.WriteAheadLog.html" title="WriteAheadLog"><code>WriteAheadLog</code></a>.</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Configuration.html" title="okaywal::Configuration struct">Configuration</a></div><div class="item-right docblock-short">A <a href="struct.WriteAheadLog.html" title="WriteAheadLog"><code>WriteAheadLog</code></a> configuration.</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Entry.html" title="okaywal::Entry struct">Entry</a></div><div class="item-right docblock-short">A stored entry inside of a <a href="struct.WriteAheadLog.html"><code>WriteAheadLog</code></a>.</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.EntryChunk.html" title="okaywal::EntryChunk struct">EntryChunk</a></div><div class="item-right docblock-short">A chunk of data previously written using
 <a href="struct.EntryWriter.html#method.write_chunk"><code>EntryWriter::write_chunk</code></a>.</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.EntryId.html" title="okaywal::EntryId struct">EntryId</a></div><div class="item-right docblock-short">The unique id of an entry written to a <a href="struct.WriteAheadLog.html" title="WriteAheadLog"><code>WriteAheadLog</code></a>. These IDs are
 ordered by the time the <a href="struct.EntryWriter.html" title="EntryWriter"><code>EntryWriter</code></a> was created for the entry written with this id.</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.EntryWriter.html" title="okaywal::EntryWriter struct">EntryWriter</a></div><div class="item-right docblock-short">A writer for an entry in a <a href="struct.WriteAheadLog.html" title="WriteAheadLog"><code>WriteAheadLog</code></a>.</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.LogPosition.html" title="okaywal::LogPosition struct">LogPosition</a></div><div class="item-right docblock-short">The position of a chunk of data within a <a href="struct.WriteAheadLog.html" title="WriteAheadLog"><code>WriteAheadLog</code></a>.</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.LogVoid.html" title="okaywal::LogVoid struct">LogVoid</a></div><div class="item-right docblock-short">A <a href="trait.LogManager.html" title="LogManager"><code>LogManager</code></a> that does not attempt to recover any existing data.</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.RecoveredSegment.html" title="okaywal::RecoveredSegment struct">RecoveredSegment</a></div><div class="item-right docblock-short">Information about an individual segment of a
