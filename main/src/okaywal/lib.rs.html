@@ -533,6 +533,9 @@
 <span id="533">533</span>
 <span id="534">534</span>
 <span id="535">535</span>
+<span id="536">536</span>
+<span id="537">537</span>
+<span id="538">538</span>
 </pre><pre class="rust"><code><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;.crate-docs.md&quot;</span>)]
 #![forbid(unsafe_code)]
 #![warn(
@@ -656,6 +659,9 @@
         <span class="kw">let </span><span class="kw-2">mut </span>files = Files::default();
         <span class="kw">let </span><span class="kw-2">mut </span>files_to_checkpoint = Vec::new();
         <span class="kw">for </span>(entry_id, path, has_checkpointed) <span class="kw">in </span>discovered_files {
+            <span class="comment">// We can safely assume that the entry id prior to the one that
+            // labels the file have been used.
+            </span>files.last_entry_id = EntryId(entry_id - <span class="number">1</span>);
             <span class="kw">if </span>has_checkpointed {
                 files
                     .inactive

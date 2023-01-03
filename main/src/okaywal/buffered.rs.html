@@ -167,6 +167,8 @@
 <span id="167">167</span>
 <span id="168">168</span>
 <span id="169">169</span>
+<span id="170">170</span>
+<span id="171">171</span>
 </pre><pre class="rust"><code><span class="kw">use </span>std::{
     fs,
     io::{<span class="self">self</span>, Seek, SeekFrom, Write},
@@ -252,7 +254,8 @@
             <span class="kw">let </span>bytes_to_copy =
                 (<span class="self">self</span>.buffer.len() - <span class="self">self</span>.buffer_write_position).min(bytes_to_write);
             <span class="kw">if </span>bytes_to_copy &gt; <span class="number">0 </span>{
-                <span class="self">self</span>.buffer[<span class="self">self</span>.buffer_write_position..].copy_from_slice(<span class="kw-2">&amp;</span>buf[..bytes_to_copy]);
+                <span class="self">self</span>.buffer[<span class="self">self</span>.buffer_write_position..<span class="self">self</span>.buffer_write_position + bytes_to_copy]
+                    .copy_from_slice(<span class="kw-2">&amp;</span>buf[..bytes_to_copy]);
             }
             <span class="kw">let </span>bytes_to_extend = bytes_to_write - bytes_to_copy;
             <span class="kw">if </span>bytes_to_extend &gt; <span class="number">0 </span>{
@@ -277,6 +280,7 @@
     </span>F: Bufferable + Seek + Write,
 {
     <span class="kw">fn </span>seek(<span class="kw-2">&amp;mut </span><span class="self">self</span>, pos: SeekFrom) -&gt; io::Result&lt;u64&gt; {
+        <span class="kw">let </span>buffer_write_position = u64::try_from(<span class="self">self</span>.buffer_write_position).to_io()<span class="question-mark">?</span>;
         <span class="kw">let </span>new_position = <span class="kw">match </span>pos {
             SeekFrom::Start(position) =&gt; position,
             SeekFrom::End(offset) =&gt; {
@@ -289,11 +293,11 @@
             }
             SeekFrom::Current(offset) =&gt; {
                 <span class="kw">if let </span><span class="prelude-val">Ok</span>(offset) = u64::try_from(offset) {
-                    <span class="self">self</span>.position + u64::try_from(<span class="self">self</span>.buffer_write_position).to_io()<span class="question-mark">? </span>+ offset
+                    <span class="self">self</span>.position + buffer_write_position + offset
                 } <span class="kw">else </span>{
                     <span class="kw">let </span>absolute_offset = -offset;
                     <span class="kw">let </span>offset = u64::try_from(absolute_offset).unwrap();
-                    <span class="self">self</span>.position + u64::try_from(<span class="self">self</span>.buffer_write_position).to_io()<span class="question-mark">? </span>- offset
+                    <span class="self">self</span>.position + buffer_write_position - offset
                 }
             }
         };
