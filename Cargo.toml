@@ -5,8 +5,8 @@ license = "MIT OR Apache-2.0"
 edition = "2021"
 description = "An okay Write-Ahead Log implementation"
 repository = "https://github.com/khonsulabs/okaywal"
-keywords = ["write-ahead log", "write-ahead logging", "wal"]
-categories = ["databases"]
+keywords = ["write-ahead-log", "write-ahead-logging", "wal"]
+categories = ["database"]
 readme = "./README.md"
 rust-version = "1.58"
 
