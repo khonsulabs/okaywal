@@ -587,7 +587,6 @@
 <span id="587">587</span>
 <span id="588">588</span>
 <span id="589">589</span>
-<span id="590">590</span>
 </pre><pre class="rust"><code><span class="kw">use </span>std::{
     fs::{File, OpenOptions},
     io::{<span class="self">self</span>, BufRead, BufReader, ErrorKind, Read, Seek, SeekFrom, Write},
@@ -901,10 +900,6 @@
     }
 
     <span class="kw">fn </span>read_next_entry(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; io::Result&lt;bool&gt; {
-        <span class="kw">if </span><span class="self">self</span>.file.buffer().is_empty() {
-            <span class="self">self</span>.file.fill_buf()<span class="question-mark">?</span>;
-        }
-
         <span class="self">self</span>.valid_until = <span class="self">self</span>.file.stream_position()<span class="question-mark">?</span>;
         <span class="kw">let </span><span class="kw-2">mut </span>header_bytes = [<span class="number">0</span>; <span class="number">9</span>];
         <span class="kw">match </span><span class="self">self</span>.file.read_exact(<span class="kw-2">&amp;mut </span>header_bytes) {
@@ -1042,6 +1037,9 @@
                 ReadChunkResult::AbortedEntry =&gt; <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>),
             };
             chunks.push(chunk.read_all()<span class="question-mark">?</span>);
+            <span class="kw">if </span>!chunk.check_crc()<span class="question-mark">? </span>{
+                <span class="kw">return </span><span class="prelude-val">Err</span>(io::Error::new(ErrorKind::InvalidData, <span class="string">&quot;crc check failed&quot;</span>));
+            }
         }
         <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(chunks))
     }
