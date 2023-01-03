@@ -311,10 +311,6 @@ impl SegmentReader {
     }
 
     fn read_next_entry(&mut self) -> io::Result<bool> {
-        if self.file.buffer().is_empty() {
-            self.file.fill_buf()?;
-        }
-
         self.valid_until = self.file.stream_position()?;
         let mut header_bytes = [0; 9];
         match self.file.read_exact(&mut header_bytes) {
@@ -452,6 +448,9 @@ impl<'entry> Entry<'entry> {
                 ReadChunkResult::AbortedEntry => return Ok(None),
             };
             chunks.push(chunk.read_all()?);
+            if !chunk.check_crc()? {
+                return Err(io::Error::new(ErrorKind::InvalidData, "crc check failed"));
+            }
         }
         Ok(Some(chunks))
     }
