@@ -588,14 +588,6 @@
 <span id="588">588</span>
 <span id="589">589</span>
 <span id="590">590</span>
-<span id="591">591</span>
-<span id="592">592</span>
-<span id="593">593</span>
-<span id="594">594</span>
-<span id="595">595</span>
-<span id="596">596</span>
-<span id="597">597</span>
-<span id="598">598</span>
 </pre><pre class="rust"><code><span class="kw">use </span>std::{
     fs::{File, OpenOptions},
     io::{<span class="self">self</span>, BufRead, BufReader, ErrorKind, Read, Seek, SeekFrom, Write},
@@ -762,7 +754,7 @@
         <span class="kw">let </span><span class="kw-2">mut </span>file = Buffered::with_capacity(file, config.buffer_bytes)<span class="question-mark">?</span>;
 
         <span class="kw">if </span>validated_length == <span class="number">0 </span>{
-            <span class="self">Self</span>::write_header(<span class="kw-2">&amp;mut </span>file, <span class="kw-2">&amp;</span>config.version_info, <span class="bool-val">false</span>)<span class="question-mark">?</span>;
+            <span class="self">Self</span>::write_header(<span class="kw-2">&amp;mut </span>file, <span class="kw-2">&amp;</span>config.version_info)<span class="question-mark">?</span>;
             file.flush()<span class="question-mark">?</span>;
         }
 
@@ -777,20 +769,11 @@
         })
     }
 
-    <span class="kw">fn </span>write_header(
-        file: <span class="kw-2">&amp;mut </span>Buffered&lt;File&gt;,
-        version_info: <span class="kw-2">&amp;</span>[u8],
-        is_overwrite: bool,
-    ) -&gt; io::Result&lt;()&gt; {
+    <span class="kw">fn </span>write_header(file: <span class="kw-2">&amp;mut </span>Buffered&lt;File&gt;, version_info: <span class="kw-2">&amp;</span>[u8]) -&gt; io::Result&lt;()&gt; {
         file.write_all(<span class="string">b&quot;okw\0&quot;</span>)<span class="question-mark">?</span>;
         <span class="kw">let </span>version_size = u8::try_from(version_info.len()).to_io()<span class="question-mark">?</span>;
         file.write_all(<span class="kw-2">&amp;</span>[version_size])<span class="question-mark">?</span>;
         file.write_all(version_info)<span class="question-mark">?</span>;
-        <span class="kw">if </span>is_overwrite {
-            file.write_all(<span class="string">b&quot;\0&quot;</span>)<span class="question-mark">?</span>;
-            file.flush()<span class="question-mark">?</span>;
-            file.seek(SeekFrom::Current(-<span class="number">1</span>))<span class="question-mark">?</span>;
-        }
         <span class="prelude-val">Ok</span>(())
     }
 
@@ -823,7 +806,7 @@
             <span class="self">self</span>.synchronized_through = length;
         }
         <span class="kw">if </span><span class="self">self</span>.synchronized_through == <span class="number">0 </span>{
-            <span class="self">Self</span>::write_header(<span class="kw-2">&amp;mut </span><span class="self">self</span>.file, <span class="kw-2">&amp;</span><span class="self">self</span>.version_info, <span class="bool-val">true</span>)<span class="question-mark">?</span>;
+            <span class="self">Self</span>::write_header(<span class="kw-2">&amp;mut </span><span class="self">self</span>.file, <span class="kw-2">&amp;</span><span class="self">self</span>.version_info)<span class="question-mark">?</span>;
             <span class="self">self</span>.last_entry_id = <span class="prelude-val">None</span>;
         }
 
@@ -931,19 +914,20 @@
         }
 
         <span class="kw">if let </span>NEW_ENTRY = header_bytes[<span class="number">0</span>] {
-            <span class="self">self</span>.current_entry_id = <span class="prelude-val">Some</span>(EntryId(u64::from_le_bytes(
-                header_bytes[<span class="number">1</span>..].try_into().unwrap(),
-            )));
-            <span class="kw">if </span><span class="self">self</span>.first_entry_id.is_none() {
-                <span class="self">self</span>.first_entry_id = <span class="self">self</span>.current_entry_id;
-            }
-            <span class="self">self</span>.last_entry_id = <span class="self">self</span>.current_entry_id;
+            <span class="kw">let </span>read_id = EntryId(u64::from_le_bytes(header_bytes[<span class="number">1</span>..].try_into().unwrap()));
+            <span class="kw">if </span>read_id.<span class="number">0 </span>&gt;= <span class="self">self</span>.file_id {
+                <span class="self">self</span>.current_entry_id = <span class="prelude-val">Some</span>(read_id);
+                <span class="kw">if </span><span class="self">self</span>.first_entry_id.is_none() {
+                    <span class="self">self</span>.first_entry_id = <span class="self">self</span>.current_entry_id;
+                }
+                <span class="self">self</span>.last_entry_id = <span class="self">self</span>.current_entry_id;
 
-            <span class="prelude-val">Ok</span>(<span class="bool-val">true</span>)
-        } <span class="kw">else </span>{
-            <span class="self">self</span>.current_entry_id = <span class="prelude-val">None</span>;
-            <span class="prelude-val">Ok</span>(<span class="bool-val">false</span>)
+                <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="bool-val">true</span>);
+            }
         }
+
+        <span class="self">self</span>.current_entry_id = <span class="prelude-val">None</span>;
+        <span class="prelude-val">Ok</span>(<span class="bool-val">false</span>)
     }
 
     <span class="doccomment">/// Reads an entry from the log. If no more entries are found, None is
