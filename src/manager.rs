@@ -3,6 +3,7 @@ use std::{fmt::Debug, io};
 use crate::{
     entry::EntryId,
     log_file::{Entry, RecoveredSegment, SegmentReader},
+    WriteAheadLog,
 };
 
 /// Customizes recovery and checkpointing behavior for a
@@ -26,17 +27,24 @@ pub trait LogManager: Send + Sync + Debug + 'static {
     /// in.
     fn recover(&mut self, entry: &mut Entry<'_>) -> io::Result<()>;
 
-    /// Invoked each time the [`WriteAheadLog`](crate::WriteAheadLog) is ready to recycle and reuse
-    /// segment files.
+    /// Invoked each time the [`WriteAheadLog`](crate::WriteAheadLog) is ready
+    /// to recycle and reuse segment files.
     ///
     /// `last_checkpointed_id` is the id of the last entry that is being
     /// checkedpointed and removed from the log. If needed,
     /// `checkpointed_entries` can be used to iterate over all entries that are
     /// being checkpointed.
+    ///
+    /// Shortly after function returns, the entries stored within the file being
+    /// checkpointed will no longer be accessible. To ensure ACID compliance of
+    /// the underlying storage layer, all necessary changes must be fully
+    /// synchronized to the underlying storage medium before this function call
+    /// returns.
     fn checkpoint_to(
         &mut self,
         last_checkpointed_id: EntryId,
         checkpointed_entries: &mut SegmentReader,
+        wal: &WriteAheadLog,
     ) -> io::Result<()>;
 }
 
@@ -67,6 +75,7 @@ impl LogManager for LogVoid {
         &mut self,
         _last_checkpointed_id: EntryId,
         _reader: &mut SegmentReader,
+        _wal: &WriteAheadLog,
     ) -> io::Result<()> {
         Ok(())
     }

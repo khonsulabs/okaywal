@@ -78,7 +78,17 @@ impl LogManager for LoggingCheckpointer {
         &mut self,
         last_checkpointed_id: EntryId,
         _checkpointed_entries: &mut SegmentReader,
+        _wal: &WriteAheadLog,
     ) -> io::Result<()> {
+        // checkpoint_to is called once enough data has been written to the
+        // WriteAheadLog. After this function returns, the log will recycle the
+        // file containing the entries being checkpointed.
+        //
+        // This function is where the entries must be persisted to the storage
+        // layer the WriteAheadLog is sitting in front of. To ensure ACID
+        // compliance of the combination of the WAL and the storage layer, the
+        // storage layer must be fully resilliant to losing any changes made by
+        // the checkpointed entries before this function returns.
         println!("LoggingCheckpointer::checkpoint_to({last_checkpointed_id:?}");
         Ok(())
     }

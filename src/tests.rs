@@ -61,6 +61,7 @@ impl LogManager for LoggingCheckpointer {
         &mut self,
         _last_checkpointed_id: EntryId,
         entries: &mut SegmentReader,
+        _wal: &WriteAheadLog,
     ) -> std::io::Result<()> {
         let mut invocations = self.invocations.lock();
         let mut data = HashMap::new();
@@ -142,6 +143,7 @@ impl LogManager for VerifyingCheckpointer {
         &mut self,
         last_checkpointed_id: EntryId,
         reader: &mut SegmentReader,
+        _wal: &WriteAheadLog,
     ) -> std::io::Result<()> {
         println!("Checkpointed to {last_checkpointed_id:?}");
         let mut entries = self.entries.lock();

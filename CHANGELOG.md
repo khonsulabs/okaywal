@@ -1,0 +1,20 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## Unreleased
+
+### Breaking Changes
+
+- `LogManager::checkpoint_to` now has an additional parameter, `wal:
+  &WriteAheadLog`. This is provided for convenience because it may be necessary
+  to randomly access information in the WAL while performing a checkpointing
+  operation.
+
+## v0.1.0
+
+- Initial public preview release. No stability guarantees are being made at this
+  stage. Feedback is welcome.

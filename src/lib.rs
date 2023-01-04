@@ -298,7 +298,7 @@ impl WriteAheadLog {
             if let Some(entry_id) = writer.last_entry_id() {
                 let mut reader = SegmentReader::new(writer.path(), writer.id())?;
                 let mut manager = wal.data.manager.lock();
-                manager.checkpoint_to(entry_id, &mut reader)?;
+                manager.checkpoint_to(entry_id, &mut reader, &wal)?;
             }
 
             // Rename the file to denote that it's been checkpointed.
