@@ -972,7 +972,7 @@
         <span class="kw">let </span>next_id = <span class="self">self</span>.last_entry_id.<span class="number">0 </span>+ <span class="number">1</span>;
         <span class="kw">let </span>file_name = <span class="macro">format!</span>(<span class="string">&quot;wal-{next_id}&quot;</span>);
         <span class="kw">let </span>file = <span class="kw">if let </span><span class="prelude-val">Some</span>(file) = <span class="self">self</span>.inactive.pop_front() {
-            file.rename(<span class="kw-2">&amp;</span>file_name)<span class="question-mark">?</span>;
+            file.rename(next_id, <span class="kw-2">&amp;</span>file_name)<span class="question-mark">?</span>;
             file
         } <span class="kw">else </span>{
             LogFile::write(next_id, config.directory.join(file_name), <span class="number">0</span>, <span class="prelude-val">None</span>, config)<span class="question-mark">?

@@ -587,6 +587,8 @@
 <span id="587">587</span>
 <span id="588">588</span>
 <span id="589">589</span>
+<span id="590">590</span>
+<span id="591">591</span>
 </pre><pre class="rust"><code><span class="kw">use </span>std::{
     fs::{File, OpenOptions},
     io::{<span class="self">self</span>, BufRead, BufReader, ErrorKind, Read, Seek, SeekFrom, Write},
@@ -640,10 +642,12 @@
         <span class="self">self</span>.data.writer.lock()
     }
 
-    <span class="kw">pub fn </span>rename(<span class="kw-2">&amp;</span><span class="self">self</span>, new_name: <span class="kw-2">&amp;</span>str) -&gt; io::Result&lt;()&gt; {
+    <span class="kw">pub fn </span>rename(<span class="kw-2">&amp;</span><span class="self">self</span>, new_id: u64, new_name: <span class="kw-2">&amp;</span>str) -&gt; io::Result&lt;()&gt; {
         <span class="kw">let </span><span class="kw-2">mut </span>writer = <span class="self">self</span>.data.writer.lock();
+        writer.id = new_id;
         writer.rename(new_name)
     }
+
     <span class="kw">pub fn </span>synchronize(<span class="kw-2">&amp;</span><span class="self">self</span>, target_synced_bytes: u64) -&gt; io::Result&lt;()&gt; {
         <span class="comment">// Flush the buffer to disk.
         </span><span class="kw">let </span>data = <span class="self">self</span>.lock();
