@@ -434,7 +434,7 @@ impl Files {
         let next_id = self.last_entry_id.0 + 1;
         let file_name = format!("wal-{next_id}");
         let file = if let Some(file) = self.inactive.pop_front() {
-            file.rename(&file_name)?;
+            file.rename(next_id, &file_name)?;
             file
         } else {
             LogFile::write(next_id, config.directory.join(file_name), 0, None, config)?

@@ -1,4 +1,4 @@
-use std::io::{self, Write};
+use std::io::{self, Read, Write};
 
 use crc32c::crc32c_append;
 use parking_lot::MutexGuard;
@@ -205,6 +205,52 @@ impl<'a> Write for ChunkWriter<'a> {
 pub struct LogPosition {
     pub(crate) file_id: u64,
     pub(crate) offset: u64,
+}
+
+impl LogPosition {
+    /// The number of bytes required to serialize a `LogPosition` using
+    /// [`LogPosition::serialize_to()`].
+    pub const SERIALIZED_LENGTH: u8 = 16;
+
+    /// Serializes this position to `destination`.
+    ///
+    /// This writes [`LogPosition::SERIALIZED_LENGTH`] bytes to `destination`.
+    pub fn serialize_to<W: Write>(&self, mut destination: W) -> io::Result<()> {
+        let mut all_bytes = [0; 16];
+        all_bytes[..8].copy_from_slice(&self.file_id.to_le_bytes());
+        all_bytes[8..].copy_from_slice(&self.offset.to_le_bytes());
+        destination.write_all(&all_bytes)
+    }
+
+    /// Deserializes a `LogPosition` from `read`.
+    ///
+    /// This reads [`LogPosition::SERIALIZED_LENGTH`] bytes from `read` and
+    /// returns the deserialized log position.
+    pub fn deserialize_from<R: Read>(mut read: R) -> io::Result<Self> {
+        let mut all_bytes = [0; 16];
+        read.read_exact(&mut all_bytes)?;
+
+        let file_id = u64::from_le_bytes(all_bytes[..8].try_into().expect("u64 is 8 bytes"));
+        let offset = u64::from_le_bytes(all_bytes[8..].try_into().expect("u64 is 8 bytes"));
+
+        Ok(Self { file_id, offset })
+    }
+}
+
+#[test]
+fn log_position_serialization() {
+    let position = LogPosition {
+        file_id: 1,
+        offset: 2,
+    };
+    let mut serialized = Vec::new();
+    position.serialize_to(&mut serialized).unwrap();
+    assert_eq!(
+        serialized.len(),
+        usize::from(LogPosition::SERIALIZED_LENGTH)
+    );
+    let deserialized = LogPosition::deserialize_from(&serialized[..]).unwrap();
+    assert_eq!(position, deserialized);
 }
 
 /// A record of a chunk that was written to a [`WriteAheadLog`].

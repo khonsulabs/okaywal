@@ -51,10 +51,12 @@ impl LogFile {
         self.data.writer.lock()
     }
 
-    pub fn rename(&self, new_name: &str) -> io::Result<()> {
+    pub fn rename(&self, new_id: u64, new_name: &str) -> io::Result<()> {
         let mut writer = self.data.writer.lock();
+        writer.id = new_id;
         writer.rename(new_name)
     }
+
     pub fn synchronize(&self, target_synced_bytes: u64) -> io::Result<()> {
         // Flush the buffer to disk.
         let data = self.lock();

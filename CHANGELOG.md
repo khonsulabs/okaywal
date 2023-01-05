@@ -14,6 +14,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   to randomly access information in the WAL while performing a checkpointing
   operation.
 
+### Added
+
+- `LogPosition::serialize_to`/`LogPosition::deserialize_from` provide methods
+  for reading and writing a `LogPosition` from an arbitrary `Write`/`Read`
+  implementor (respectively). This uses a fixed-length serialization with a
+  length of `LogPosition::SERIALIZED_LENGTH` -- 16 bytes.
+
+### Fixed
+
+- When the WAL recycles a segment file, the `LogPosition` returned is now
+  correct. Previously, returned `LogPosition`s would contain the segment file's
+  old id, causing those positions to be unreadable.
+
 ## v0.1.0
 
 - Initial public preview release. No stability guarantees are being made at this
