@@ -21,11 +21,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   implementor (respectively). This uses a fixed-length serialization with a
   length of `LogPosition::SERIALIZED_LENGTH` -- 16 bytes.
 
+### Changed
+
+- `WriteAheadLog::shutdown()` now no longer requires all instances of
+  `WriteAheadLog` to be dropped to succeed.
+
 ### Fixed
 
 - When the WAL recycles a segment file, the `LogPosition` returned is now
   correct. Previously, returned `LogPosition`s would contain the segment file's
   old id, causing those positions to be unreadable.
+- When reading from a `LogPosition`, if the data has not been flushed or
+  synchronized to disk yet, the read will be blocked until the sync operation
+  finishes.
 
 ## v0.1.0
 

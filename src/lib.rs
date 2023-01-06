@@ -68,7 +68,7 @@ struct Data {
     active_sync: Condvar,
     dirfsync_sync: Condvar,
     config: Configuration,
-    checkpoint_sender: flume::Sender<LogFile>,
+    checkpoint_sender: flume::Sender<CheckpointCommand>,
     checkpoint_thread: Mutex<Option<JoinHandle<io::Result<()>>>>,
     readers: Mutex<HashMap<u64, usize>>,
     readers_sync: Condvar,
@@ -81,6 +81,7 @@ struct Files {
     last_entry_id: EntryId,
     directory_synced_at: Option<Instant>,
     directory_is_syncing: bool,
+    all: HashMap<u64, LogFile>,
 }
 
 impl WriteAheadLog {
@@ -125,9 +126,9 @@ impl WriteAheadLog {
             // labels the file have been used.
             files.last_entry_id = EntryId(entry_id - 1);
             if has_checkpointed {
-                files
-                    .inactive
-                    .push_back(LogFile::write(entry_id, path, 0, None, &config)?);
+                let file = LogFile::write(entry_id, path, 0, None, &config)?;
+                files.all.insert(entry_id, file.clone());
+                files.inactive.push_back(file);
             } else {
                 let mut reader = SegmentReader::new(&path, entry_id)?;
                 match manager.should_recover_segment(&reader.header)? {
@@ -143,17 +144,21 @@ impl WriteAheadLog {
                             files.last_entry_id = entry.id();
                         }
 
-                        files_to_checkpoint.push(LogFile::write(
+                        let file = LogFile::write(
                             entry_id,
                             path,
                             reader.valid_until,
                             reader.last_entry_id,
                             &config,
-                        )?);
+                        )?;
+                        files.all.insert(entry_id, file.clone());
+                        files_to_checkpoint.push(file);
                     }
-                    Recovery::Abandon => files
-                        .inactive
-                        .push_back(LogFile::write(entry_id, path, 0, None, &config)?),
+                    Recovery::Abandon => {
+                        let file = LogFile::write(entry_id, path, 0, None, &config)?;
+                        files.all.insert(entry_id, file.clone());
+                        files.inactive.push_back(file);
+                    }
                 }
             }
         }
@@ -183,7 +188,7 @@ impl WriteAheadLog {
         for file_to_checkpoint in files_to_checkpoint {
             wal.data
                 .checkpoint_sender
-                .send(file_to_checkpoint)
+                .send(CheckpointCommand::Checkpoint(file_to_checkpoint))
                 .to_io()?;
         }
 
@@ -236,7 +241,10 @@ impl WriteAheadLog {
                 self.data.active_sync.notify_one();
 
                 // Now, send the file to the checkpointer.
-                self.data.checkpoint_sender.send(file.clone()).to_io()?;
+                self.data
+                    .checkpoint_sender
+                    .send(CheckpointCommand::Checkpoint(file.clone()))
+                    .to_io()?;
 
                 last_directory_sync
             } else {
@@ -281,9 +289,10 @@ impl WriteAheadLog {
 
     fn checkpoint_thread(
         data: &Weak<Data>,
-        checkpoint_receiver: &flume::Receiver<LogFile>,
+        checkpoint_receiver: &flume::Receiver<CheckpointCommand>,
     ) -> io::Result<()> {
-        while let Ok(file_to_checkpoint) = checkpoint_receiver.recv() {
+        while let Ok(CheckpointCommand::Checkpoint(file_to_checkpoint)) = checkpoint_receiver.recv()
+        {
             let wal = if let Some(data) = data.upgrade() {
                 WriteAheadLog { data }
             } else {
@@ -291,14 +300,17 @@ impl WriteAheadLog {
             };
 
             let mut writer = file_to_checkpoint.lock();
+            let file_id = writer.id();
             while !writer.is_synchronized() {
                 let synchronize_target = writer.position();
                 writer = file_to_checkpoint.synchronize_locked(writer, synchronize_target)?;
             }
             if let Some(entry_id) = writer.last_entry_id() {
-                let mut reader = SegmentReader::new(writer.path(), writer.id())?;
+                let mut reader = SegmentReader::new(writer.path(), file_id)?;
+                drop(writer);
                 let mut manager = wal.data.manager.lock();
                 manager.checkpoint_to(entry_id, &mut reader, &wal)?;
+                writer = file_to_checkpoint.lock();
             }
 
             // Rename the file to denote that it's been checkpointed.
@@ -312,19 +324,21 @@ impl WriteAheadLog {
                     .expect("should be ascii")
             );
             writer.rename(&new_name)?;
+            drop(writer);
 
             // Now, read attemps will fail, but any current readers are still
             // able to read the data. Before we truncate the file, we need to
             // wait for all existing readers to close.
             let mut readers = wal.data.readers.lock();
-            while readers.get(&writer.id()).copied().unwrap_or(0) > 0 {
+            while readers.get(&file_id).copied().unwrap_or(0) > 0 {
                 wal.data.readers_sync.wait(&mut readers);
             }
-            readers.remove(&writer.id());
+            readers.remove(&file_id);
             drop(readers);
 
             // Now that there are no readers, we can safely prepare the file for
             // reuse.
+            let mut writer = file_to_checkpoint.lock();
             writer.revert_to(0)?;
             drop(writer);
 
@@ -377,6 +391,18 @@ impl WriteAheadLog {
     /// - The file cannot be read.
     /// - The position refers to data that has been checkpointed.
     pub fn read_at(&self, position: LogPosition) -> io::Result<ChunkReader<'_>> {
+        // Before opening the file to read, we need to check that this position
+        // has been written to disk fully.
+        let files = self.data.files.lock();
+        let log_file = files
+            .all
+            .get(&position.file_id)
+            .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "invalid log position"))?
+            .clone();
+        drop(files);
+
+        log_file.synchronize(position.offset)?;
+
         let mut file = File::open(
             self.data
                 .config
@@ -417,10 +443,11 @@ impl WriteAheadLog {
         let mut checkpoint_thread = self.data.checkpoint_thread.lock();
         let join_handle = checkpoint_thread.take().expect("shutdown already invoked");
         drop(checkpoint_thread);
-        // Dropping self allows the flume::Sender to be freed, as the checkpoint
-        // thread only has a weak reference while receiving the next file to
-        // checkpoint.
-        drop(self);
+
+        self.data
+            .checkpoint_sender
+            .send(CheckpointCommand::Shutdown)
+            .map_err(|_| io::Error::from(ErrorKind::BrokenPipe))?;
 
         // Wait for the checkpoint thread to terminate.
         join_handle
@@ -429,15 +456,25 @@ impl WriteAheadLog {
     }
 }
 
+enum CheckpointCommand {
+    Checkpoint(LogFile),
+    Shutdown,
+}
+
 impl Files {
     pub fn activate_new_file(&mut self, config: &Configuration) -> io::Result<()> {
         let next_id = self.last_entry_id.0 + 1;
         let file_name = format!("wal-{next_id}");
         let file = if let Some(file) = self.inactive.pop_front() {
+            let old_id = file.lock().id();
             file.rename(next_id, &file_name)?;
+            let all_entry = self.all.remove(&old_id).expect("missing all entry");
+            self.all.insert(next_id, all_entry);
             file
         } else {
-            LogFile::write(next_id, config.directory.join(file_name), 0, None, config)?
+            let file = LogFile::write(next_id, config.directory.join(file_name), 0, None, config)?;
+            self.all.insert(next_id, file.clone());
+            file
         };
 
         self.active = Some(file);
