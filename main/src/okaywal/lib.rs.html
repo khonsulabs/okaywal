@@ -536,6 +536,43 @@
 <span id="536">536</span>
 <span id="537">537</span>
 <span id="538">538</span>
+<span id="539">539</span>
+<span id="540">540</span>
+<span id="541">541</span>
+<span id="542">542</span>
+<span id="543">543</span>
+<span id="544">544</span>
+<span id="545">545</span>
+<span id="546">546</span>
+<span id="547">547</span>
+<span id="548">548</span>
+<span id="549">549</span>
+<span id="550">550</span>
+<span id="551">551</span>
+<span id="552">552</span>
+<span id="553">553</span>
+<span id="554">554</span>
+<span id="555">555</span>
+<span id="556">556</span>
+<span id="557">557</span>
+<span id="558">558</span>
+<span id="559">559</span>
+<span id="560">560</span>
+<span id="561">561</span>
+<span id="562">562</span>
+<span id="563">563</span>
+<span id="564">564</span>
+<span id="565">565</span>
+<span id="566">566</span>
+<span id="567">567</span>
+<span id="568">568</span>
+<span id="569">569</span>
+<span id="570">570</span>
+<span id="571">571</span>
+<span id="572">572</span>
+<span id="573">573</span>
+<span id="574">574</span>
+<span id="575">575</span>
 </pre><pre class="rust"><code><span class="attribute">#![doc = <span class="macro">include_str!</span>(<span class="string">&quot;.crate-docs.md&quot;</span>)]
 #![forbid(unsafe_code)]
 #![warn(
@@ -606,7 +643,7 @@
     active_sync: Condvar,
     dirfsync_sync: Condvar,
     config: Configuration,
-    checkpoint_sender: flume::Sender&lt;LogFile&gt;,
+    checkpoint_sender: flume::Sender&lt;CheckpointCommand&gt;,
     checkpoint_thread: Mutex&lt;<span class="prelude-ty">Option</span>&lt;JoinHandle&lt;io::Result&lt;()&gt;&gt;&gt;&gt;,
     readers: Mutex&lt;HashMap&lt;u64, usize&gt;&gt;,
     readers_sync: Condvar,
@@ -619,6 +656,7 @@
     last_entry_id: EntryId,
     directory_synced_at: <span class="prelude-ty">Option</span>&lt;Instant&gt;,
     directory_is_syncing: bool,
+    all: HashMap&lt;u64, LogFile&gt;,
 }
 
 <span class="kw">impl </span>WriteAheadLog {
@@ -663,9 +701,9 @@
             // labels the file have been used.
             </span>files.last_entry_id = EntryId(entry_id - <span class="number">1</span>);
             <span class="kw">if </span>has_checkpointed {
-                files
-                    .inactive
-                    .push_back(LogFile::write(entry_id, path, <span class="number">0</span>, <span class="prelude-val">None</span>, <span class="kw-2">&amp;</span>config)<span class="question-mark">?</span>);
+                <span class="kw">let </span>file = LogFile::write(entry_id, path, <span class="number">0</span>, <span class="prelude-val">None</span>, <span class="kw-2">&amp;</span>config)<span class="question-mark">?</span>;
+                files.all.insert(entry_id, file.clone());
+                files.inactive.push_back(file);
             } <span class="kw">else </span>{
                 <span class="kw">let </span><span class="kw-2">mut </span>reader = SegmentReader::new(<span class="kw-2">&amp;</span>path, entry_id)<span class="question-mark">?</span>;
                 <span class="kw">match </span>manager.should_recover_segment(<span class="kw-2">&amp;</span>reader.header)<span class="question-mark">? </span>{
@@ -681,17 +719,21 @@
                             files.last_entry_id = entry.id();
                         }
 
-                        files_to_checkpoint.push(LogFile::write(
+                        <span class="kw">let </span>file = LogFile::write(
                             entry_id,
                             path,
                             reader.valid_until,
                             reader.last_entry_id,
                             <span class="kw-2">&amp;</span>config,
-                        )<span class="question-mark">?</span>);
+                        )<span class="question-mark">?</span>;
+                        files.all.insert(entry_id, file.clone());
+                        files_to_checkpoint.push(file);
                     }
-                    Recovery::Abandon =&gt; files
-                        .inactive
-                        .push_back(LogFile::write(entry_id, path, <span class="number">0</span>, <span class="prelude-val">None</span>, <span class="kw-2">&amp;</span>config)<span class="question-mark">?</span>),
+                    Recovery::Abandon =&gt; {
+                        <span class="kw">let </span>file = LogFile::write(entry_id, path, <span class="number">0</span>, <span class="prelude-val">None</span>, <span class="kw-2">&amp;</span>config)<span class="question-mark">?</span>;
+                        files.all.insert(entry_id, file.clone());
+                        files.inactive.push_back(file);
+                    }
                 }
             }
         }
@@ -721,7 +763,7 @@
         <span class="kw">for </span>file_to_checkpoint <span class="kw">in </span>files_to_checkpoint {
             wal.data
                 .checkpoint_sender
-                .send(file_to_checkpoint)
+                .send(CheckpointCommand::Checkpoint(file_to_checkpoint))
                 .to_io()<span class="question-mark">?</span>;
         }
 
@@ -774,7 +816,10 @@
                 <span class="self">self</span>.data.active_sync.notify_one();
 
                 <span class="comment">// Now, send the file to the checkpointer.
-                </span><span class="self">self</span>.data.checkpoint_sender.send(file.clone()).to_io()<span class="question-mark">?</span>;
+                </span><span class="self">self</span>.data
+                    .checkpoint_sender
+                    .send(CheckpointCommand::Checkpoint(file.clone()))
+                    .to_io()<span class="question-mark">?</span>;
 
                 last_directory_sync
             } <span class="kw">else </span>{
@@ -819,9 +864,10 @@
 
     <span class="kw">fn </span>checkpoint_thread(
         data: <span class="kw-2">&amp;</span>Weak&lt;Data&gt;,
-        checkpoint_receiver: <span class="kw-2">&amp;</span>flume::Receiver&lt;LogFile&gt;,
+        checkpoint_receiver: <span class="kw-2">&amp;</span>flume::Receiver&lt;CheckpointCommand&gt;,
     ) -&gt; io::Result&lt;()&gt; {
-        <span class="kw">while let </span><span class="prelude-val">Ok</span>(file_to_checkpoint) = checkpoint_receiver.recv() {
+        <span class="kw">while let </span><span class="prelude-val">Ok</span>(CheckpointCommand::Checkpoint(file_to_checkpoint)) = checkpoint_receiver.recv()
+        {
             <span class="kw">let </span>wal = <span class="kw">if let </span><span class="prelude-val">Some</span>(data) = data.upgrade() {
                 WriteAheadLog { data }
             } <span class="kw">else </span>{
@@ -829,14 +875,17 @@
             };
 
             <span class="kw">let </span><span class="kw-2">mut </span>writer = file_to_checkpoint.lock();
+            <span class="kw">let </span>file_id = writer.id();
             <span class="kw">while </span>!writer.is_synchronized() {
                 <span class="kw">let </span>synchronize_target = writer.position();
                 writer = file_to_checkpoint.synchronize_locked(writer, synchronize_target)<span class="question-mark">?</span>;
             }
             <span class="kw">if let </span><span class="prelude-val">Some</span>(entry_id) = writer.last_entry_id() {
-                <span class="kw">let </span><span class="kw-2">mut </span>reader = SegmentReader::new(writer.path(), writer.id())<span class="question-mark">?</span>;
+                <span class="kw">let </span><span class="kw-2">mut </span>reader = SegmentReader::new(writer.path(), file_id)<span class="question-mark">?</span>;
+                drop(writer);
                 <span class="kw">let </span><span class="kw-2">mut </span>manager = wal.data.manager.lock();
                 manager.checkpoint_to(entry_id, <span class="kw-2">&amp;mut </span>reader, <span class="kw-2">&amp;</span>wal)<span class="question-mark">?</span>;
+                writer = file_to_checkpoint.lock();
             }
 
             <span class="comment">// Rename the file to denote that it&#39;s been checkpointed.
@@ -850,20 +899,22 @@
                     .expect(<span class="string">&quot;should be ascii&quot;</span>)
             );
             writer.rename(<span class="kw-2">&amp;</span>new_name)<span class="question-mark">?</span>;
+            drop(writer);
 
             <span class="comment">// Now, read attemps will fail, but any current readers are still
             // able to read the data. Before we truncate the file, we need to
             // wait for all existing readers to close.
             </span><span class="kw">let </span><span class="kw-2">mut </span>readers = wal.data.readers.lock();
-            <span class="kw">while </span>readers.get(<span class="kw-2">&amp;</span>writer.id()).copied().unwrap_or(<span class="number">0</span>) &gt; <span class="number">0 </span>{
+            <span class="kw">while </span>readers.get(<span class="kw-2">&amp;</span>file_id).copied().unwrap_or(<span class="number">0</span>) &gt; <span class="number">0 </span>{
                 wal.data.readers_sync.wait(<span class="kw-2">&amp;mut </span>readers);
             }
-            readers.remove(<span class="kw-2">&amp;</span>writer.id());
+            readers.remove(<span class="kw-2">&amp;</span>file_id);
             drop(readers);
 
             <span class="comment">// Now that there are no readers, we can safely prepare the file for
             // reuse.
-            </span>writer.revert_to(<span class="number">0</span>)<span class="question-mark">?</span>;
+            </span><span class="kw">let </span><span class="kw-2">mut </span>writer = file_to_checkpoint.lock();
+            writer.revert_to(<span class="number">0</span>)<span class="question-mark">?</span>;
             drop(writer);
 
             <span class="kw">let </span>sync_target = Instant::now();
@@ -915,6 +966,18 @@
     /// - The file cannot be read.
     /// - The position refers to data that has been checkpointed.
     </span><span class="kw">pub fn </span>read_at(<span class="kw-2">&amp;</span><span class="self">self</span>, position: LogPosition) -&gt; io::Result&lt;ChunkReader&lt;<span class="lifetime">&#39;_</span>&gt;&gt; {
+        <span class="comment">// Before opening the file to read, we need to check that this position
+        // has been written to disk fully.
+        </span><span class="kw">let </span>files = <span class="self">self</span>.data.files.lock();
+        <span class="kw">let </span>log_file = files
+            .all
+            .get(<span class="kw-2">&amp;</span>position.file_id)
+            .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, <span class="string">&quot;invalid log position&quot;</span>))<span class="question-mark">?
+            </span>.clone();
+        drop(files);
+
+        log_file.synchronize(position.offset)<span class="question-mark">?</span>;
+
         <span class="kw">let </span><span class="kw-2">mut </span>file = File::open(
             <span class="self">self</span>.data
                 .config
@@ -955,10 +1018,11 @@
         <span class="kw">let </span><span class="kw-2">mut </span>checkpoint_thread = <span class="self">self</span>.data.checkpoint_thread.lock();
         <span class="kw">let </span>join_handle = checkpoint_thread.take().expect(<span class="string">&quot;shutdown already invoked&quot;</span>);
         drop(checkpoint_thread);
-        <span class="comment">// Dropping self allows the flume::Sender to be freed, as the checkpoint
-        // thread only has a weak reference while receiving the next file to
-        // checkpoint.
-        </span>drop(<span class="self">self</span>);
+
+        <span class="self">self</span>.data
+            .checkpoint_sender
+            .send(CheckpointCommand::Shutdown)
+            .map_err(|<span class="kw">_</span>| io::Error::from(ErrorKind::BrokenPipe))<span class="question-mark">?</span>;
 
         <span class="comment">// Wait for the checkpoint thread to terminate.
         </span>join_handle
@@ -967,16 +1031,26 @@
     </span>}
 }
 
+<span class="kw">enum </span>CheckpointCommand {
+    Checkpoint(LogFile),
+    Shutdown,
+}
+
 <span class="kw">impl </span>Files {
     <span class="kw">pub fn </span>activate_new_file(<span class="kw-2">&amp;mut </span><span class="self">self</span>, config: <span class="kw-2">&amp;</span>Configuration) -&gt; io::Result&lt;()&gt; {
         <span class="kw">let </span>next_id = <span class="self">self</span>.last_entry_id.<span class="number">0 </span>+ <span class="number">1</span>;
         <span class="kw">let </span>file_name = <span class="macro">format!</span>(<span class="string">&quot;wal-{next_id}&quot;</span>);
         <span class="kw">let </span>file = <span class="kw">if let </span><span class="prelude-val">Some</span>(file) = <span class="self">self</span>.inactive.pop_front() {
+            <span class="kw">let </span>old_id = file.lock().id();
             file.rename(next_id, <span class="kw-2">&amp;</span>file_name)<span class="question-mark">?</span>;
+            <span class="kw">let </span>all_entry = <span class="self">self</span>.all.remove(<span class="kw-2">&amp;</span>old_id).expect(<span class="string">&quot;missing all entry&quot;</span>);
+            <span class="self">self</span>.all.insert(next_id, all_entry);
             file
         } <span class="kw">else </span>{
-            LogFile::write(next_id, config.directory.join(file_name), <span class="number">0</span>, <span class="prelude-val">None</span>, config)<span class="question-mark">?
-        </span>};
+            <span class="kw">let </span>file = LogFile::write(next_id, config.directory.join(file_name), <span class="number">0</span>, <span class="prelude-val">None</span>, config)<span class="question-mark">?</span>;
+            <span class="self">self</span>.all.insert(next_id, file.clone());
+            file
+        };
 
         <span class="self">self</span>.active = <span class="prelude-val">Some</span>(file);
 
