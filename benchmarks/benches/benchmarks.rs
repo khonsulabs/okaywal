@@ -33,6 +33,9 @@ fn main() {
     #[cfg(feature = "postgres")]
     let bench = bench.with::<postgres::Postgres>();
 
+    #[cfg(feature = "sqlite")]
+    let bench = bench.with::<sqlite::SQLite>();
+
     bench.run(&measurements).unwrap();
 
     let stats = measurements.wait_for_stats();
@@ -220,6 +223,98 @@ mod postgres {
                     .execute("INSERT INTO okaywal_inserts (data) values ($1)", &[&data])
                     .unwrap();
 
+                measurement.finish();
+            }
+            Ok(())
+        }
+    }
+}
+
+#[cfg(feature = "sqlite")]
+mod sqlite {
+
+    use std::sync::Mutex;
+
+    use rusqlite::Connection;
+    use tempfile::NamedTempFile;
+
+    use super::*;
+
+    #[derive(Clone, Debug)]
+    pub struct SQLite {
+        config: InsertConfig,
+        sqlite: Arc<Mutex<Connection>>,
+        _file: Arc<NamedTempFile>,
+    }
+
+    impl BenchmarkImplementation<Label, InsertConfig, Infallible> for SQLite {
+        type SharedConfig = Self;
+
+        fn label(number_of_threads: usize, _config: &InsertConfig) -> Label {
+            Label::from(format!("sqlite-{:02}t", number_of_threads))
+        }
+
+        fn initialize_shared_config(
+            _number_of_threads: usize,
+            config: &InsertConfig,
+        ) -> Result<Self::SharedConfig, Infallible> {
+            let tmp_file = NamedTempFile::new_in(".").unwrap();
+            let sqlite = Connection::open(&tmp_file).unwrap();
+            sqlite
+                .busy_timeout(std::time::Duration::from_secs(3600))
+                .unwrap();
+
+            #[cfg(any(target_os = "macos", target_os = "ios"))]
+            {
+                // On macOS with built-in SQLite versions, despite the name and the SQLite
+                // documentation, this pragma makes SQLite use `fcntl(_, F_BARRIER_FSYNC,
+                // _)`. There's not a good practical way to make rusqlite's access of SQLite
+                // on macOS to use `F_FULLFSYNC`, which skews benchmarks heavily in favor of
+                // SQLite when not enabling this feature.
+                //
+                // Enabling this feature reduces the durability guarantees, which breaks
+                // ACID compliance. Unless performance is critical on macOS or you know that
+                // ACID compliance is not important for your application, this feature
+                // should be left disabled.
+                //
+                // <https://bonsaidb.io/blog/acid-on-apple/>
+                // <https://www.sqlite.org/pragma.html#pragma_fullfsync>
+                sqlite.pragma_update(None, "fullfsync", "on").unwrap();
+                println!("The shipping version of SQLite on macOS is not actually ACID-compliant. See this blog post:\n<https://bonsaidb.io/blog/acid-on-apple/>");
+            }
+            sqlite.pragma_update(None, "journal_mode", "WAL").unwrap();
+
+            sqlite
+                .execute("create table if not exists okaywal_inserts (data BLOB)", [])
+                .unwrap();
+            Ok(Self {
+                config: *config,
+                sqlite: Arc::new(Mutex::new(sqlite)),
+                _file: Arc::new(tmp_file),
+            })
+        }
+
+        fn reset(_shutting_down: bool) -> Result<(), Infallible> {
+            Ok(())
+        }
+
+        fn initialize(
+            _number_of_threads: usize,
+            config: Self::SharedConfig,
+        ) -> Result<Self, Infallible> {
+            Ok(config)
+        }
+
+        fn measure(&mut self, measurements: &LabeledTimings<Label>) -> Result<(), Infallible> {
+            let metric = Label::from(format!("commit-{}", Bytes(self.config.number_of_bytes)));
+            let data = vec![42_u8; self.config.number_of_bytes];
+            for _ in 0..self.config.iters {
+                let measurement = measurements.begin(metric.clone());
+                let client = self.sqlite.lock().unwrap(); // SQLite doesn't have a way to allow multi-threaded write access to a single database.
+                client
+                    .execute("INSERT INTO okaywal_inserts (data) values ($1)", [&data])
+                    .unwrap();
+                drop(client);
                 measurement.finish();
             }
             Ok(())
