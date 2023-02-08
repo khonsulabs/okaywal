@@ -2,10 +2,12 @@ use std::{
     collections::{BTreeMap, HashMap},
     io::{Read, Write},
     iter::repeat_with,
+    path::Path,
     sync::Arc,
     time::Duration,
 };
 
+use file_manager::{fs::StdFileManager, memory::MemoryFileManager, FileManager};
 use parking_lot::Mutex;
 use tempfile::tempdir;
 
@@ -33,7 +35,10 @@ enum CheckpointCall {
     },
 }
 
-impl LogManager for LoggingCheckpointer {
+impl<M> LogManager<M> for LoggingCheckpointer
+where
+    M: file_manager::FileManager,
+{
     fn should_recover_segment(&mut self, segment: &RecoveredSegment) -> std::io::Result<Recovery> {
         let mut invocations = self.invocations.lock();
         invocations.push(CheckpointCall::ShouldRecoverSegment {
@@ -43,7 +48,7 @@ impl LogManager for LoggingCheckpointer {
         Ok(Recovery::Recover)
     }
 
-    fn recover(&mut self, entry: &mut Entry<'_>) -> std::io::Result<()> {
+    fn recover(&mut self, entry: &mut Entry<'_, M::File>) -> std::io::Result<()> {
         let entry_id = entry.id;
 
         if let Some(chunks) = entry.read_all_chunks()? {
@@ -60,8 +65,8 @@ impl LogManager for LoggingCheckpointer {
     fn checkpoint_to(
         &mut self,
         _last_checkpointed_id: EntryId,
-        entries: &mut SegmentReader,
-        _wal: &WriteAheadLog,
+        entries: &mut SegmentReader<M::File>,
+        _wal: &WriteAheadLog<M>,
     ) -> std::io::Result<()> {
         let mut invocations = self.invocations.lock();
         let mut data = HashMap::new();
@@ -76,15 +81,14 @@ impl LogManager for LoggingCheckpointer {
     }
 }
 
-#[test]
-fn basic() {
-    let dir = tempdir().unwrap();
-
+fn basic<M: FileManager, P: AsRef<Path>>(manager: M, path: P) {
     let checkpointer = LoggingCheckpointer::default();
 
     let message = b"hello world";
 
-    let wal = WriteAheadLog::recover(&dir, checkpointer.clone()).unwrap();
+    let config = Configuration::default_with_manager(path, manager);
+
+    let wal = config.clone().open(checkpointer.clone()).unwrap();
     let mut writer = wal.begin_entry().unwrap();
     let record = writer.write_chunk(message).unwrap();
     let written_entry_id = writer.commit().unwrap();
@@ -95,10 +99,10 @@ fn basic() {
     assert!(invocations.is_empty());
     drop(invocations);
 
-    let wal = WriteAheadLog::recover(&dir, checkpointer.clone()).unwrap();
+    let wal = config.open(checkpointer.clone()).unwrap();
 
     let invocations = checkpointer.invocations.lock();
-    println!("Invocations: {:?}", invocations);
+    println!("Invocations: {invocations:?}");
     assert_eq!(invocations.len(), 2);
     match &invocations[0] {
         CheckpointCall::ShouldRecoverSegment { version_info } => {
@@ -123,13 +127,27 @@ fn basic() {
     assert!(reader.crc_is_valid().expect("error validating crc"));
 }
 
+#[test]
+fn basic_std() {
+    let dir = tempdir().unwrap();
+    basic(StdFileManager::default(), &dir);
+}
+
+#[test]
+fn basic_memory() {
+    basic(MemoryFileManager::default(), "/");
+}
+
 #[derive(Debug, Default, Clone)]
 struct VerifyingCheckpointer {
     entries: Arc<Mutex<BTreeMap<EntryId, Vec<Vec<u8>>>>>,
 }
 
-impl LogManager for VerifyingCheckpointer {
-    fn recover(&mut self, entry: &mut Entry<'_>) -> std::io::Result<()> {
+impl<M> LogManager<M> for VerifyingCheckpointer
+where
+    M: file_manager::FileManager,
+{
+    fn recover(&mut self, entry: &mut Entry<'_, M::File>) -> std::io::Result<()> {
         dbg!(entry.id);
         if let Some(chunks) = entry.read_all_chunks()? {
             let mut entries = self.entries.lock();
@@ -142,8 +160,8 @@ impl LogManager for VerifyingCheckpointer {
     fn checkpoint_to(
         &mut self,
         last_checkpointed_id: EntryId,
-        reader: &mut SegmentReader,
-        _wal: &WriteAheadLog,
+        reader: &mut SegmentReader<M::File>,
+        _wal: &WriteAheadLog<M>,
     ) -> std::io::Result<()> {
         println!("Checkpointed to {last_checkpointed_id:?}");
         let mut entries = self.entries.lock();
@@ -160,15 +178,14 @@ impl LogManager for VerifyingCheckpointer {
     }
 }
 
-#[test]
-fn multithreaded() {
-    let dir = tempdir().unwrap();
-
+fn multithreaded<M: FileManager, P: AsRef<Path>>(manager: M, path: P) {
     let mut threads = Vec::new();
 
     let checkpointer = VerifyingCheckpointer::default();
     let original_entries = checkpointer.entries.clone();
-    let wal = WriteAheadLog::recover(&dir, checkpointer).unwrap();
+    let wal = Configuration::default_with_manager(path.as_ref(), manager.clone())
+        .open(checkpointer)
+        .unwrap();
 
     for _ in 0..5 {
         let wal = wal.clone();
@@ -206,7 +223,9 @@ fn multithreaded() {
     println!("Reopening log");
     let checkpointer = VerifyingCheckpointer::default();
     let recovered_entries = checkpointer.entries.clone();
-    let _wal = WriteAheadLog::recover(&dir, checkpointer).unwrap();
+    let _wal = Configuration::default_with_manager(path.as_ref(), manager)
+        .open(checkpointer)
+        .unwrap();
     let recovered_entries = recovered_entries.lock();
     let original_entries = original_entries.lock();
     // Check keys first because it's easier to verify a list of ids than it is
@@ -219,14 +238,24 @@ fn multithreaded() {
 }
 
 #[test]
-fn aborted_entry() {
+fn multithreaded_std() {
     let dir = tempdir().unwrap();
+    multithreaded(StdFileManager::default(), &dir);
+}
 
+#[test]
+fn multithreaded_memory() {
+    multithreaded(MemoryFileManager::default(), "/");
+}
+
+fn aborted_entry<M: FileManager, P: AsRef<Path>>(manager: M, path: P) {
     let checkpointer = LoggingCheckpointer::default();
 
     let message = b"hello world";
 
-    let wal = WriteAheadLog::recover(&dir, checkpointer.clone()).unwrap();
+    let wal = Configuration::default_with_manager(path.as_ref(), manager.clone())
+        .open(checkpointer.clone())
+        .unwrap();
     let mut writer = wal.begin_entry().unwrap();
     let record = writer.write_chunk(message).unwrap();
     let written_entry_id = writer
@@ -239,7 +268,9 @@ fn aborted_entry() {
     assert!(invocations.is_empty());
     drop(invocations);
 
-    WriteAheadLog::recover(&dir, checkpointer.clone()).unwrap();
+    Configuration::default_with_manager(path.as_ref(), manager)
+        .open(checkpointer.clone())
+        .unwrap();
 
     let invocations = checkpointer.invocations.lock();
     assert_eq!(invocations.len(), 2);
@@ -261,10 +292,20 @@ fn aborted_entry() {
 }
 
 #[test]
-fn always_checkpointing() {
+fn aborted_entry_std() {
     let dir = tempdir().unwrap();
+    aborted_entry(StdFileManager::default(), &dir);
+}
+
+#[test]
+fn aborted_entry_memory() {
+    aborted_entry(MemoryFileManager::default(), "/");
+}
+
+fn always_checkpointing<M: FileManager, P: AsRef<Path>>(manager: M, path: P) {
     let checkpointer = LoggingCheckpointer::default();
-    let config = Configuration::default_for(&dir).checkpoint_after_bytes(33);
+    let config =
+        Configuration::default_with_manager(path.as_ref(), manager).checkpoint_after_bytes(33);
 
     let mut written_chunks = Vec::new();
     for i in 0_usize..100 {
@@ -287,7 +328,7 @@ fn always_checkpointing() {
     std::thread::sleep(Duration::from_millis(100));
 
     let invocations = checkpointer.invocations.lock();
-    println!("Invocations: {:?}", invocations);
+    println!("Invocations: {invocations:?}");
 
     for (index, (entry_id, _)) in written_chunks.into_iter().enumerate() {
         println!("Checking {index}");
@@ -304,4 +345,15 @@ fn always_checkpointing() {
 
         assert_eq!(chunk_data[0], index.to_be_bytes());
     }
+}
+
+#[test]
+fn always_checkpointing_std() {
+    let dir = tempdir().unwrap();
+    always_checkpointing(StdFileManager::default(), &dir);
+}
+
+#[test]
+fn always_checkpointing_memory() {
+    always_checkpointing(MemoryFileManager::default(), "/");
 }

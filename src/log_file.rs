@@ -1,11 +1,10 @@
 use std::{
-    fs::{File, OpenOptions},
     io::{self, BufRead, BufReader, ErrorKind, Read, Seek, SeekFrom, Write},
-    path::{Path, PathBuf},
     sync::Arc,
     time::Instant,
 };
 
+use file_manager::{fs::StdFile, FileManager, OpenOptions, PathId};
 use parking_lot::{Condvar, Mutex, MutexGuard};
 
 use crate::{
@@ -15,18 +14,24 @@ use crate::{
     Configuration, LogPosition,
 };
 
-#[derive(Debug, Clone)]
-pub struct LogFile {
-    data: Arc<LogFileData>,
+#[derive(Debug)]
+pub struct LogFile<F>
+where
+    F: file_manager::File,
+{
+    data: Arc<LogFileData<F>>,
 }
 
-impl LogFile {
+impl<F> LogFile<F>
+where
+    F: file_manager::File,
+{
     pub fn write(
         id: u64,
-        path: PathBuf,
+        path: PathId,
         validated_length: u64,
         last_entry_id: Option<EntryId>,
-        config: &Configuration,
+        config: &Configuration<F::Manager>,
     ) -> io::Result<Self> {
         let writer = LogFileWriter::new(id, path, validated_length, last_entry_id, config)?;
         let created_at = if last_entry_id.is_some() {
@@ -47,7 +52,7 @@ impl LogFile {
         self.data.created_at
     }
 
-    pub fn lock(&self) -> MutexGuard<'_, LogFileWriter> {
+    pub fn lock(&self) -> MutexGuard<'_, LogFileWriter<F>> {
         self.data.writer.lock()
     }
 
@@ -66,9 +71,9 @@ impl LogFile {
 
     pub fn synchronize_locked<'a>(
         &'a self,
-        mut data: MutexGuard<'a, LogFileWriter>,
+        mut data: MutexGuard<'a, LogFileWriter<F>>,
         target_synced_bytes: u64,
-    ) -> io::Result<MutexGuard<'a, LogFileWriter>> {
+    ) -> io::Result<MutexGuard<'a, LogFileWriter<F>>> {
         loop {
             if data.synchronized_through >= target_synced_bytes {
                 // While we were waiting for the lock, another thread synced our
@@ -107,40 +112,60 @@ impl LogFile {
         Ok(data)
     }
 }
+impl<F> Clone for LogFile<F>
+where
+    F: file_manager::File,
+{
+    fn clone(&self) -> Self {
+        Self {
+            data: self.data.clone(),
+        }
+    }
+}
 
 #[derive(Debug)]
-struct LogFileData {
-    writer: Mutex<LogFileWriter>,
+struct LogFileData<F>
+where
+    F: file_manager::File,
+{
+    writer: Mutex<LogFileWriter<F>>,
     created_at: Option<Instant>,
     sync: Condvar,
 }
 
 #[derive(Debug)]
-pub struct LogFileWriter {
+pub struct LogFileWriter<F>
+where
+    F: file_manager::File,
+{
     id: u64,
-    path: Arc<PathBuf>,
-    file: Buffered<File>,
+    path: PathId,
+    file: Buffered<F>,
     last_entry_id: Option<EntryId>,
     version_info: Arc<Vec<u8>>,
     synchronized_through: u64,
     is_syncing: bool,
+    manager: F::Manager,
 }
 
 static ZEROES: [u8; 8196] = [0; 8196];
 
-impl LogFileWriter {
+impl<F> LogFileWriter<F>
+where
+    F: file_manager::File,
+{
     fn new(
         id: u64,
-        path: PathBuf,
+        path: PathId,
         validated_length: u64,
         last_entry_id: Option<EntryId>,
-        config: &Configuration,
+        config: &Configuration<F::Manager>,
     ) -> io::Result<Self> {
-        let mut file = OpenOptions::new()
-            .create(true)
-            .write(true)
-            .read(true)
-            .open(&path)?;
+        println!("New {}", path.display());
+        let mut file = config.file_manager.open(
+            &path,
+            OpenOptions::new().create(true).write(true).read(true),
+        )?;
 
         // Truncate or extend the file to the next multiple of the preallocation
         // length.
@@ -150,14 +175,16 @@ impl LogFileWriter {
         let length = file.seek(SeekFrom::End(0))?;
         let bytes_to_fill = padded_length.checked_sub(length);
         if let Some(bytes_to_fill) = bytes_to_fill {
-            let mut bytes_to_fill = usize::try_from(bytes_to_fill).to_io()?;
-            // Pre-allocate this disk space by writing zeroes.
-            file.set_len(padded_length)?;
-            file.seek(SeekFrom::Start(validated_length))?;
-            while bytes_to_fill > 0 {
-                let bytes_to_write = bytes_to_fill.min(ZEROES.len());
-                file.write_all(&ZEROES[..bytes_to_write])?;
-                bytes_to_fill -= bytes_to_write;
+            if bytes_to_fill > 0 {
+                let mut bytes_to_fill = usize::try_from(bytes_to_fill).to_io()?;
+                // Pre-allocate this disk space by writing zeroes.
+                file.set_len(padded_length)?;
+                file.seek(SeekFrom::Start(validated_length))?;
+                while bytes_to_fill > 0 {
+                    let bytes_to_write = bytes_to_fill.min(ZEROES.len());
+                    file.write_all(&ZEROES[..bytes_to_write])?;
+                    bytes_to_fill -= bytes_to_write;
+                }
             }
         }
 
@@ -172,16 +199,17 @@ impl LogFileWriter {
 
         Ok(Self {
             id,
-            path: Arc::new(path),
+            path,
             file,
             last_entry_id,
             version_info: config.version_info.clone(),
             synchronized_through: validated_length,
             is_syncing: false,
+            manager: config.file_manager.clone(),
         })
     }
 
-    fn write_header(file: &mut Buffered<File>, version_info: &[u8]) -> io::Result<()> {
+    fn write_header(file: &mut Buffered<F>, version_info: &[u8]) -> io::Result<()> {
         file.write_all(b"okw\0")?;
         let version_size = u8::try_from(version_info.len()).to_io()?;
         file.write_all(&[version_size])?;
@@ -189,7 +217,7 @@ impl LogFileWriter {
         Ok(())
     }
 
-    pub fn path(&self) -> &Path {
+    pub fn path(&self) -> &PathId {
         &self.path
     }
 
@@ -226,13 +254,14 @@ impl LogFileWriter {
     }
 
     pub fn rename(&mut self, new_name: &str) -> io::Result<()> {
-        let new_path = self
-            .path
-            .parent()
-            .expect("parent path not found")
-            .join(new_name);
-        std::fs::rename(&*self.path, &new_path)?;
-        self.path = Arc::new(new_path);
+        let new_path = PathId::from(
+            self.path
+                .parent()
+                .expect("parent path not found")
+                .join(new_name),
+        );
+        self.manager.rename(&self.path, new_path.clone())?;
+        self.path = new_path;
 
         Ok(())
     }
@@ -246,7 +275,10 @@ impl LogFileWriter {
     }
 }
 
-impl Write for LogFileWriter {
+impl<F> Write for LogFileWriter<F>
+where
+    F: file_manager::File,
+{
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         let bytes_written = self.file.write(buf)?;
 
@@ -260,9 +292,12 @@ impl Write for LogFileWriter {
 
 /// Reads a log segment, which contains one or more log entries.
 #[derive(Debug)]
-pub struct SegmentReader {
+pub struct SegmentReader<F = StdFile>
+where
+    F: file_manager::File,
+{
     pub(crate) file_id: u64,
-    pub(crate) file: BufReader<File>,
+    pub(crate) file: BufReader<F>,
     pub(crate) header: RecoveredSegment,
     pub(crate) current_entry_id: Option<EntryId>,
     pub(crate) first_entry_id: Option<EntryId>,
@@ -270,10 +305,16 @@ pub struct SegmentReader {
     pub(crate) valid_until: u64,
 }
 
-impl SegmentReader {
-    pub(crate) fn new(path: &Path, file_id: u64) -> io::Result<Self> {
-        let mut file = File::open(path)?;
-        file.seek(SeekFrom::Start(0))?;
+impl<F> SegmentReader<F>
+where
+    F: file_manager::File,
+{
+    pub(crate) fn new<M>(path: &PathId, file_id: u64, manager: &M) -> io::Result<Self>
+    where
+        M: FileManager<File = F>,
+    {
+        let mut file = manager.open(path, OpenOptions::new().read(true))?;
+        file.rewind()?;
         let mut file = BufReader::new(file);
         let mut buffer = Vec::with_capacity(256 + 5);
         buffer.resize(5, 0);
@@ -340,7 +381,7 @@ impl SegmentReader {
 
     /// Reads an entry from the log. If no more entries are found, None is
     /// returned.
-    pub fn read_entry(&mut self) -> io::Result<Option<Entry<'_>>> {
+    pub fn read_entry(&mut self) -> io::Result<Option<Entry<'_, F>>> {
         if let Some(id) = self.current_entry_id.take() {
             // Skip the remainder of the current entry.
             let mut entry = Entry { id, reader: self };
@@ -372,12 +413,18 @@ impl SegmentReader {
 /// Each entry is composed of a series of chunks of data that were previously
 /// written using [`EntryWriter::write_chunk`](crate::EntryWriter::write_chunk).
 #[derive(Debug)]
-pub struct Entry<'a> {
+pub struct Entry<'a, F = StdFile>
+where
+    F: file_manager::File,
+{
     pub(crate) id: EntryId,
-    pub(crate) reader: &'a mut SegmentReader,
+    pub(crate) reader: &'a mut SegmentReader<F>,
 }
 
-impl<'entry> Entry<'entry> {
+impl<'entry, F> Entry<'entry, F>
+where
+    F: file_manager::File,
+{
     /// The unique id of this entry.
     #[must_use]
     pub const fn id(&self) -> EntryId {
@@ -407,7 +454,7 @@ impl<'entry> Entry<'entry> {
     /// the tradeoffs is not knowing the full length of an entry when it is
     /// being written. This allows for very large log entries to be written
     /// without requiring memory for the entire entry.
-    pub fn read_chunk<'chunk>(&'chunk mut self) -> io::Result<ReadChunkResult<'chunk, 'entry>> {
+    pub fn read_chunk<'chunk>(&'chunk mut self) -> io::Result<ReadChunkResult<'chunk, 'entry, F>> {
         if self.reader.file.buffer().is_empty() {
             self.reader.file.fill_buf()?;
         }
@@ -460,9 +507,12 @@ impl<'entry> Entry<'entry> {
 
 /// The result of reading a chunk from a log segment.
 #[derive(Debug)]
-pub enum ReadChunkResult<'chunk, 'entry> {
+pub enum ReadChunkResult<'chunk, 'entry, F>
+where
+    F: file_manager::File,
+{
     /// A chunk was found.
-    Chunk(EntryChunk<'chunk, 'entry>),
+    Chunk(EntryChunk<'chunk, 'entry, F>),
     /// The end of the entry has been reached.
     EndOfEntry,
     /// An aborted entry was detected. This should only be encountered if log
@@ -489,15 +539,21 @@ pub enum ReadChunkResult<'chunk, 'entry> {
 /// - Using [`EntryChunk::read_all()`] to read all remaining bytes at once.
 /// - Skipping all remaining bytes using [`EntryChunk::skip_remaining_bytes()`]
 #[derive(Debug)]
-pub struct EntryChunk<'chunk, 'entry> {
-    entry: &'chunk mut Entry<'entry>,
+pub struct EntryChunk<'chunk, 'entry, F>
+where
+    F: file_manager::File,
+{
+    entry: &'chunk mut Entry<'entry, F>,
     position: LogPosition,
     bytes_remaining: u32,
     calculated_crc: u32,
     stored_crc32: Option<u32>,
 }
 
-impl<'chunk, 'entry> EntryChunk<'chunk, 'entry> {
+impl<'chunk, 'entry, F> EntryChunk<'chunk, 'entry, F>
+where
+    F: file_manager::File,
+{
     /// Returns the position that this chunk is located at.
     #[must_use]
     pub fn log_position(&self) -> LogPosition {
@@ -558,7 +614,10 @@ impl<'chunk, 'entry> EntryChunk<'chunk, 'entry> {
     }
 }
 
-impl<'chunk, 'entry> Read for EntryChunk<'chunk, 'entry> {
+impl<'chunk, 'entry, F> Read for EntryChunk<'chunk, 'entry, F>
+where
+    F: file_manager::File,
+{
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         let bytes_remaining = usize::try_from(self.bytes_remaining).to_io()?;
         let bytes_to_read = bytes_remaining.min(buf.len());
@@ -574,7 +633,10 @@ impl<'chunk, 'entry> Read for EntryChunk<'chunk, 'entry> {
     }
 }
 
-impl<'chunk, 'entry> Drop for EntryChunk<'chunk, 'entry> {
+impl<'chunk, 'entry, F> Drop for EntryChunk<'chunk, 'entry, F>
+where
+    F: file_manager::File,
+{
     fn drop(&mut self) {
         self.skip_remaining_bytes_internal()
             .expect("error while skipping remaining bytes");

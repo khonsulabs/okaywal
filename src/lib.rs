@@ -15,7 +15,7 @@
 
 use std::{
     collections::{HashMap, VecDeque},
-    fs::{self, File},
+    ffi::OsStr,
     io::{self, BufReader, ErrorKind, Read, Seek, SeekFrom},
     path::Path,
     sync::{Arc, Weak},
@@ -23,6 +23,7 @@ use std::{
     time::Instant,
 };
 
+use file_manager::{fs::StdFileManager, FileManager, OpenOptions, PathId};
 use parking_lot::{Condvar, Mutex, MutexGuard};
 
 pub use crate::{
@@ -32,6 +33,7 @@ pub use crate::{
     manager::{LogManager, LogVoid, Recovery},
 };
 use crate::{log_file::LogFile, to_io_result::ToIoResult};
+pub use file_manager;
 
 mod buffered;
 mod config;
@@ -57,34 +59,30 @@ mod to_io_result;
 ///
 /// [wal]: https://en.wikipedia.org/wiki/Write-ahead_logging
 #[derive(Debug, Clone)]
-pub struct WriteAheadLog {
-    data: Arc<Data>,
+pub struct WriteAheadLog<M = StdFileManager>
+where
+    M: FileManager,
+{
+    data: Arc<Data<M>>,
 }
 
 #[derive(Debug)]
-struct Data {
-    files: Mutex<Files>,
-    manager: Mutex<Box<dyn LogManager>>,
+struct Data<M>
+where
+    M: FileManager,
+{
+    files: Mutex<Files<M::File>>,
+    manager: Mutex<Box<dyn LogManager<M>>>,
     active_sync: Condvar,
     dirfsync_sync: Condvar,
-    config: Configuration,
-    checkpoint_sender: flume::Sender<CheckpointCommand>,
+    config: Configuration<M>,
+    checkpoint_sender: flume::Sender<CheckpointCommand<M::File>>,
     checkpoint_thread: Mutex<Option<JoinHandle<io::Result<()>>>>,
     readers: Mutex<HashMap<u64, usize>>,
     readers_sync: Condvar,
 }
 
-#[derive(Debug, Default)]
-struct Files {
-    active: Option<LogFile>,
-    inactive: VecDeque<LogFile>,
-    last_entry_id: EntryId,
-    directory_synced_at: Option<Instant>,
-    directory_is_syncing: bool,
-    all: HashMap<u64, LogFile>,
-}
-
-impl WriteAheadLog {
+impl WriteAheadLog<StdFileManager> {
     /// Creates or opens a log in `directory` using the provided log manager to
     /// drive recovery and checkpointing.
     pub fn recover<AsRefPath: AsRef<Path>, Manager: LogManager>(
@@ -93,15 +91,23 @@ impl WriteAheadLog {
     ) -> io::Result<Self> {
         Configuration::default_for(directory).open(manager)
     }
-
-    fn open<Manager: LogManager>(config: Configuration, mut manager: Manager) -> io::Result<Self> {
-        if !config.directory.exists() {
-            std::fs::create_dir_all(&config.directory)?;
+}
+impl<M> WriteAheadLog<M>
+where
+    M: FileManager,
+{
+    fn open<Manager: LogManager<M>>(
+        config: Configuration<M>,
+        mut manager: Manager,
+    ) -> io::Result<Self> {
+        if !config.file_manager.exists(&config.directory) {
+            config.file_manager.create_dir_all(&config.directory)?;
         }
+
         // Find all files that match this pattern: "wal-[0-9]+(-cp)?"
         let mut discovered_files = Vec::new();
-        for file in fs::read_dir(&config.directory)?.filter_map(Result::ok) {
-            if let Some(file_name) = file.file_name().to_str() {
+        for file in config.file_manager.list(&config.directory)? {
+            if let Some(file_name) = file.file_name().and_then(OsStr::to_str) {
                 let mut parts = file_name.split('-');
                 let prefix = parts.next();
                 let entry_id = parts.next().and_then(|ts| ts.parse::<u64>().ok());
@@ -109,7 +115,7 @@ impl WriteAheadLog {
                 match (prefix, entry_id, suffix) {
                     (Some(prefix), Some(entry_id), suffix) if prefix == "wal" => {
                         let has_checkpointed = suffix == Some("cp");
-                        discovered_files.push((entry_id, file.path(), has_checkpointed));
+                        discovered_files.push((entry_id, file, has_checkpointed));
                     }
                     _ => {}
                 }
@@ -130,7 +136,7 @@ impl WriteAheadLog {
                 files.all.insert(entry_id, file.clone());
                 files.inactive.push_back(file);
             } else {
-                let mut reader = SegmentReader::new(&path, entry_id)?;
+                let mut reader = SegmentReader::new(&path, entry_id, &config.file_manager)?;
                 match manager.should_recover_segment(&reader.header)? {
                     Recovery::Recover => {
                         while let Some(mut entry) = reader.read_entry()? {
@@ -213,7 +219,7 @@ impl WriteAheadLog {
     ///
     /// This call will acquire an exclusive lock to the active file or block
     /// until it can be acquired.
-    pub fn begin_entry(&self) -> io::Result<EntryWriter<'_>> {
+    pub fn begin_entry(&self) -> io::Result<EntryWriter<'_, M>> {
         let mut files = self.data.files.lock();
         let file = loop {
             if let Some(file) = files.active.take() {
@@ -230,7 +236,7 @@ impl WriteAheadLog {
         EntryWriter::new(self, entry_id, file)
     }
 
-    fn reclaim(&self, file: LogFile, result: WriteResult) -> io::Result<()> {
+    fn reclaim(&self, file: LogFile<M::File>, result: WriteResult) -> io::Result<()> {
         if let WriteResult::Entry { new_length } = result {
             let last_directory_sync = if self.data.config.checkpoint_after_bytes <= new_length {
                 // Checkpoint this file. This first means activating a new file.
@@ -288,8 +294,8 @@ impl WriteAheadLog {
     }
 
     fn checkpoint_thread(
-        data: &Weak<Data>,
-        checkpoint_receiver: &flume::Receiver<CheckpointCommand>,
+        data: &Weak<Data<M>>,
+        checkpoint_receiver: &flume::Receiver<CheckpointCommand<M::File>>,
     ) -> io::Result<()> {
         while let Ok(CheckpointCommand::Checkpoint(file_to_checkpoint)) = checkpoint_receiver.recv()
         {
@@ -306,7 +312,8 @@ impl WriteAheadLog {
                 writer = file_to_checkpoint.synchronize_locked(writer, synchronize_target)?;
             }
             if let Some(entry_id) = writer.last_entry_id() {
-                let mut reader = SegmentReader::new(writer.path(), file_id)?;
+                let mut reader =
+                    SegmentReader::new(writer.path(), file_id, &wal.data.config.file_manager)?;
                 drop(writer);
                 let mut manager = wal.data.manager.lock();
                 manager.checkpoint_to(entry_id, &mut reader, &wal)?;
@@ -354,9 +361,9 @@ impl WriteAheadLog {
 
     fn sync_directory<'a>(
         &'a self,
-        mut files: MutexGuard<'a, Files>,
+        mut files: MutexGuard<'a, Files<M::File>>,
         sync_on_or_after: Instant,
-    ) -> io::Result<MutexGuard<'a, Files>> {
+    ) -> io::Result<MutexGuard<'a, Files<M::File>>> {
         loop {
             if files.directory_synced_at.is_some()
                 && files.directory_synced_at.unwrap() >= sync_on_or_after
@@ -367,9 +374,11 @@ impl WriteAheadLog {
             } else {
                 files.directory_is_syncing = true;
                 drop(files);
-                let directory = File::open(&self.data.config.directory)?;
                 let synced_at = Instant::now();
-                directory.sync_all()?;
+                self.data
+                    .config
+                    .file_manager
+                    .sync_all(&self.data.config.directory)?;
 
                 files = self.data.files.lock();
                 files.directory_is_syncing = false;
@@ -390,7 +399,7 @@ impl WriteAheadLog {
     ///
     /// - The file cannot be read.
     /// - The position refers to data that has been checkpointed.
-    pub fn read_at(&self, position: LogPosition) -> io::Result<ChunkReader<'_>> {
+    pub fn read_at(&self, position: LogPosition) -> io::Result<ChunkReader<'_, M>> {
         // Before opening the file to read, we need to check that this position
         // has been written to disk fully.
         let files = self.data.files.lock();
@@ -403,11 +412,14 @@ impl WriteAheadLog {
 
         log_file.synchronize(position.offset)?;
 
-        let mut file = File::open(
-            self.data
-                .config
-                .directory
-                .join(format!("wal-{}", position.file_id)),
+        let mut file = self.data.config.file_manager.open(
+            &PathId::from(
+                self.data
+                    .config
+                    .directory
+                    .join(format!("wal-{}", position.file_id)),
+            ),
+            OpenOptions::new().read(true),
         )?;
         file.seek(SeekFrom::Start(position.offset))?;
         let mut reader = BufReader::new(file);
@@ -456,13 +468,32 @@ impl WriteAheadLog {
     }
 }
 
-enum CheckpointCommand {
-    Checkpoint(LogFile),
+enum CheckpointCommand<F>
+where
+    F: file_manager::File,
+{
+    Checkpoint(LogFile<F>),
     Shutdown,
 }
 
-impl Files {
-    pub fn activate_new_file(&mut self, config: &Configuration) -> io::Result<()> {
+#[derive(Debug)]
+struct Files<F>
+where
+    F: file_manager::File,
+{
+    active: Option<LogFile<F>>,
+    inactive: VecDeque<LogFile<F>>,
+    last_entry_id: EntryId,
+    directory_synced_at: Option<Instant>,
+    directory_is_syncing: bool,
+    all: HashMap<u64, LogFile<F>>,
+}
+
+impl<F> Files<F>
+where
+    F: file_manager::File,
+{
+    pub fn activate_new_file(&mut self, config: &Configuration<F::Manager>) -> io::Result<()> {
         let next_id = self.last_entry_id.0 + 1;
         let file_name = format!("wal-{next_id}");
         let file = if let Some(file) = self.inactive.pop_front() {
@@ -472,7 +503,13 @@ impl Files {
             self.all.insert(next_id, all_entry);
             file
         } else {
-            let file = LogFile::write(next_id, config.directory.join(file_name), 0, None, config)?;
+            let file = LogFile::write(
+                next_id,
+                config.directory.join(file_name).into(),
+                0,
+                None,
+                config,
+            )?;
             self.all.insert(next_id, file.clone());
             file
         };
@@ -480,6 +517,22 @@ impl Files {
         self.active = Some(file);
 
         Ok(())
+    }
+}
+
+impl<F> Default for Files<F>
+where
+    F: file_manager::File,
+{
+    fn default() -> Self {
+        Self {
+            active: None,
+            inactive: VecDeque::new(),
+            last_entry_id: EntryId::default(),
+            directory_synced_at: None,
+            directory_is_syncing: false,
+            all: HashMap::new(),
+        }
     }
 }
 
@@ -494,17 +547,23 @@ enum WriteResult {
 /// This reader will stop returning bytes after reading all bytes previously
 /// written.
 #[derive(Debug)]
-pub struct ChunkReader<'a> {
-    wal: &'a WriteAheadLog,
+pub struct ChunkReader<'a, M>
+where
+    M: FileManager,
+{
+    wal: &'a WriteAheadLog<M>,
     file_id: u64,
-    reader: BufReader<File>,
+    reader: BufReader<M::File>,
     bytes_remaining: u32,
     length: u32,
     stored_crc32: Option<u32>,
     read_crc32: u32,
 }
 
-impl<'a> ChunkReader<'a> {
+impl<'a, M> ChunkReader<'a, M>
+where
+    M: FileManager,
+{
     /// Returns the length of the data stored.
     ///
     /// This value will not change as data is read.
@@ -545,7 +604,10 @@ impl<'a> ChunkReader<'a> {
     }
 }
 
-impl<'a> Read for ChunkReader<'a> {
+impl<'a, M> Read for ChunkReader<'a, M>
+where
+    M: FileManager,
+{
     fn read(&mut self, mut buf: &mut [u8]) -> io::Result<usize> {
         let bytes_remaining =
             usize::try_from(self.bytes_remaining).expect("too large for platform");
@@ -559,7 +621,10 @@ impl<'a> Read for ChunkReader<'a> {
     }
 }
 
-impl<'a> Drop for ChunkReader<'a> {
+impl<'a, M> Drop for ChunkReader<'a, M>
+where
+    M: FileManager,
+{
     fn drop(&mut self) {
         let mut readers = self.wal.data.readers.lock();
         let file_readers = readers

@@ -1,18 +1,19 @@
-use std::{
-    io,
-    ops::Mul,
-    path::{Path, PathBuf},
-    sync::Arc,
-};
+use std::{io, ops::Mul, path::Path, sync::Arc};
+
+use file_manager::{fs::StdFileManager, FileManager, PathId};
 
 use crate::{LogManager, WriteAheadLog};
 
 /// A [`WriteAheadLog`] configuration.
 #[derive(Debug, Clone)]
 #[must_use]
-pub struct Configuration {
+pub struct Configuration<M> {
+    /// The file manager to use for storing data.
+    ///
+    /// Typically this is [`StdFileManager`].
+    pub file_manager: M,
     /// The directory to store the log files in.
-    pub directory: PathBuf,
+    pub directory: PathId,
     /// The number of bytes each log file should be preallocated with. Log files
     /// may grow to be larger than this size if needed.
     pub preallocate_bytes: u32,
@@ -33,13 +34,13 @@ pub struct Configuration {
     pub version_info: Arc<Vec<u8>>,
 }
 
-impl Default for Configuration {
+impl Default for Configuration<StdFileManager> {
     fn default() -> Self {
         Self::default_for("okaywal")
     }
 }
 
-impl Configuration {
+impl Configuration<StdFileManager> {
     /// Returns the default configuration for a given directory.
     ///
     /// This currently is:
@@ -48,15 +49,31 @@ impl Configuration {
     /// - `checkpoint_after_bytes`: 768 kilobytes
     /// - `buffer_bytes`: 16 kilobytes
     pub fn default_for<P: AsRef<Path>>(path: P) -> Self {
+        Self::default_with_manager(path, StdFileManager::default())
+    }
+}
+
+impl<M> Configuration<M>
+where
+    M: FileManager,
+{
+    /// Returns the default configuration for a given directory and file manager.
+    ///
+    /// This currently is:
+    ///
+    /// - `preallocate_bytes`: 1 megabyte
+    /// - `checkpoint_after_bytes`: 768 kilobytes
+    /// - `buffer_bytes`: 16 kilobytes
+    pub fn default_with_manager<P: AsRef<Path>>(path: P, file_manager: M) -> Self {
         Self {
-            directory: path.as_ref().to_path_buf(),
+            file_manager,
+            directory: PathId::from(path.as_ref()),
             preallocate_bytes: megabytes(1),
             checkpoint_after_bytes: kilobytes(768),
             buffer_bytes: kilobytes(16),
             version_info: Arc::default(),
         }
     }
-
     /// Sets the number of bytes to preallocate for each segment file. Returns self.
     ///
     /// Preallocating disk space allows for more consistent performance. This
@@ -89,7 +106,7 @@ impl Configuration {
     }
 
     /// Opens the log using the provided log manager with this configuration.
-    pub fn open<Manager: LogManager>(self, manager: Manager) -> io::Result<WriteAheadLog> {
+    pub fn open<Manager: LogManager<M>>(self, manager: Manager) -> io::Result<WriteAheadLog<M>> {
         WriteAheadLog::open(self, manager)
     }
 }

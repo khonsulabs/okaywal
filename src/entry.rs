@@ -1,6 +1,7 @@
 use std::io::{self, Read, Write};
 
 use crc32c::crc32c_append;
+use file_manager::FileManager;
 use parking_lot::MutexGuard;
 
 use crate::{
@@ -14,10 +15,13 @@ use crate::{
 /// Only one writer can be active for a given [`WriteAheadLog`] at any given
 /// time. See [`WriteAheadLog::begin_entry()`] for more information.
 #[derive(Debug)]
-pub struct EntryWriter<'a> {
+pub struct EntryWriter<'a, M>
+where
+    M: FileManager,
+{
     id: EntryId,
-    log: &'a WriteAheadLog,
-    file: Option<LogFile>,
+    log: &'a WriteAheadLog<M>,
+    file: Option<LogFile<M::File>>,
     original_length: u64,
 }
 
@@ -25,8 +29,15 @@ pub const NEW_ENTRY: u8 = 1;
 pub const CHUNK: u8 = 2;
 pub const END_OF_ENTRY: u8 = 3;
 
-impl<'a> EntryWriter<'a> {
-    pub(super) fn new(log: &'a WriteAheadLog, id: EntryId, file: LogFile) -> io::Result<Self> {
+impl<'a, M> EntryWriter<'a, M>
+where
+    M: FileManager,
+{
+    pub(super) fn new(
+        log: &'a WriteAheadLog<M>,
+        id: EntryId,
+        file: LogFile<M::File>,
+    ) -> io::Result<Self> {
         let mut writer = file.lock();
         let original_length = writer.position();
 
@@ -58,7 +69,7 @@ impl<'a> EntryWriter<'a> {
         self.commit_and(|_file| Ok(()))
     }
 
-    pub(crate) fn commit_and<F: FnOnce(&mut LogFileWriter) -> io::Result<()>>(
+    pub(crate) fn commit_and<F: FnOnce(&mut LogFileWriter<M::File>) -> io::Result<()>>(
         mut self,
         callback: F,
     ) -> io::Result<EntryId> {
@@ -109,7 +120,7 @@ impl<'a> EntryWriter<'a> {
     /// The writer returned already contains an internal buffer. This function
     /// can be used to write a complex payload without needing to first
     /// combine it in another buffer.
-    pub fn begin_chunk(&mut self, length: u32) -> io::Result<ChunkWriter<'_>> {
+    pub fn begin_chunk(&mut self, length: u32) -> io::Result<ChunkWriter<'_, M::File>> {
         let mut file = self.file.as_ref().expect("already dropped").lock();
 
         let position = LogPosition {
@@ -131,7 +142,10 @@ impl<'a> EntryWriter<'a> {
     }
 }
 
-impl<'a> Drop for EntryWriter<'a> {
+impl<'a, M> Drop for EntryWriter<'a, M>
+where
+    M: FileManager,
+{
     fn drop(&mut self) {
         if self.file.is_some() {
             self.rollback_session().unwrap();
@@ -139,8 +153,11 @@ impl<'a> Drop for EntryWriter<'a> {
     }
 }
 
-pub struct ChunkWriter<'a> {
-    file: MutexGuard<'a, LogFileWriter>,
+pub struct ChunkWriter<'a, F>
+where
+    F: file_manager::File,
+{
+    file: MutexGuard<'a, LogFileWriter<F>>,
     position: LogPosition,
     length: u32,
     bytes_remaining: u32,
@@ -148,7 +165,10 @@ pub struct ChunkWriter<'a> {
     finished: bool,
 }
 
-impl<'a> ChunkWriter<'a> {
+impl<'a, F> ChunkWriter<'a, F>
+where
+    F: file_manager::File,
+{
     pub fn finish(mut self) -> io::Result<ChunkRecord> {
         self.write_tail()?;
         Ok(ChunkRecord {
@@ -172,7 +192,10 @@ impl<'a> ChunkWriter<'a> {
     }
 }
 
-impl<'a> Drop for ChunkWriter<'a> {
+impl<'a, F> Drop for ChunkWriter<'a, F>
+where
+    F: file_manager::File,
+{
     fn drop(&mut self) {
         if !self.finished {
             self.write_tail()
@@ -181,7 +204,10 @@ impl<'a> Drop for ChunkWriter<'a> {
     }
 }
 
-impl<'a> Write for ChunkWriter<'a> {
+impl<'a, F> Write for ChunkWriter<'a, F>
+where
+    F: file_manager::File,
+{
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         let bytes_to_write = buf
             .len()

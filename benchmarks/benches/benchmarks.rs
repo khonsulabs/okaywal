@@ -58,7 +58,7 @@ impl BenchmarkImplementation<Label, InsertConfig, Infallible> for OkayWal {
     type SharedConfig = (InsertConfig, Arc<TempDir>, WriteAheadLog);
 
     fn label(number_of_threads: usize, _config: &InsertConfig) -> Label {
-        Label::from(format!("okaywal-{:02}t", number_of_threads))
+        Label::from(format!("okaywal-{number_of_threads:02}t"))
     }
 
     fn initialize_shared_config(
@@ -332,6 +332,6 @@ impl Display for Bytes {
             1048576..=1073741823 => (self.0 / 1024 / 1024, "MB"),
             _ => unreachable!(),
         };
-        write!(f, "{}{}", size_number, size_label)
+        write!(f, "{size_number}{size_label}")
     }
 }

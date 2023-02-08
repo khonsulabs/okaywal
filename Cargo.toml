@@ -15,6 +15,7 @@ parking_lot = "0.12.1"
 crc32c = "0.6.3"
 flume = "0.10.14"
 tracing = { version = "0.1.36", optional = true }
+file-manager = { git = "https://github.com/khonsulabs/file-manager", branch = "main" }
 
 [dev-dependencies]
 tempfile = "3.3.0"
@@ -24,4 +25,6 @@ fastrand = "1.8.0"
 members = ["benchmarks", "xtask"]
 
 [profile.bench]
+debug = true
+[profile.release]
 debug = true

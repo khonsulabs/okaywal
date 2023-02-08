@@ -1,5 +1,7 @@
 use std::{fmt::Debug, io};
 
+use file_manager::{fs::StdFileManager, FileManager};
+
 use crate::{
     entry::EntryId,
     log_file::{Entry, RecoveredSegment, SegmentReader},
@@ -8,7 +10,10 @@ use crate::{
 
 /// Customizes recovery and checkpointing behavior for a
 /// [`WriteAheadLog`](crate::WriteAheadLog).
-pub trait LogManager: Send + Sync + Debug + 'static {
+pub trait LogManager<M = StdFileManager>: Send + Sync + Debug + 'static
+where
+    M: FileManager,
+{
     /// When recovering a [`WriteAheadLog`](crate::WriteAheadLog), this function
     /// is called for each segment as it is read. To allow the segment to have
     /// its data recovered, return [`Recovery::Recover`]. If you wish to abandon
@@ -25,7 +30,7 @@ pub trait LogManager: Send + Sync + Debug + 'static {
     /// [`EntryWriter::write_chunk`](crate::EntryWriter::write_chunk). The order
     /// of chunks is guaranteed to be the same as the order they were written
     /// in.
-    fn recover(&mut self, entry: &mut Entry<'_>) -> io::Result<()>;
+    fn recover(&mut self, entry: &mut Entry<'_, M::File>) -> io::Result<()>;
 
     /// Invoked each time the [`WriteAheadLog`](crate::WriteAheadLog) is ready
     /// to recycle and reuse segment files.
@@ -43,8 +48,8 @@ pub trait LogManager: Send + Sync + Debug + 'static {
     fn checkpoint_to(
         &mut self,
         last_checkpointed_id: EntryId,
-        checkpointed_entries: &mut SegmentReader,
-        wal: &WriteAheadLog,
+        checkpointed_entries: &mut SegmentReader<M::File>,
+        wal: &WriteAheadLog<M>,
     ) -> io::Result<()>;
 }
 
@@ -62,20 +67,23 @@ pub enum Recovery {
 #[derive(Debug)]
 pub struct LogVoid;
 
-impl LogManager for LogVoid {
+impl<M> LogManager<M> for LogVoid
+where
+    M: file_manager::FileManager,
+{
     fn should_recover_segment(&mut self, _segment: &RecoveredSegment) -> io::Result<Recovery> {
         Ok(Recovery::Abandon)
     }
 
-    fn recover(&mut self, _entry: &mut Entry<'_>) -> io::Result<()> {
+    fn recover(&mut self, _entry: &mut Entry<'_, M::File>) -> io::Result<()> {
         Ok(())
     }
 
     fn checkpoint_to(
         &mut self,
         _last_checkpointed_id: EntryId,
-        _reader: &mut SegmentReader,
-        _wal: &WriteAheadLog,
+        _reader: &mut SegmentReader<M::File>,
+        _wal: &WriteAheadLog<M>,
     ) -> io::Result<()> {
         Ok(())
     }

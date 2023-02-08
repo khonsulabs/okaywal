@@ -1,7 +1,4 @@
-use std::{
-    fs,
-    io::{self, Seek, SeekFrom, Write},
-};
+use std::io::{self, Seek, SeekFrom, Write};
 
 use crate::to_io_result::ToIoResult;
 
@@ -154,9 +151,12 @@ pub trait Bufferable {
     fn set_len(&self, new_length: u64) -> io::Result<()>;
 }
 
-impl Bufferable for fs::File {
+impl<F> Bufferable for F
+where
+    F: file_manager::File,
+{
     fn len(&self) -> io::Result<u64> {
-        Ok(self.metadata()?.len())
+        file_manager::File::len(self)
     }
 
     fn set_len(&self, new_length: u64) -> io::Result<()> {
