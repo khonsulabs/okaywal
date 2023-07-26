@@ -284,7 +284,7 @@ fn log_position_serialization() {
 pub struct ChunkRecord {
     /// The position of the chunk.
     pub position: LogPosition,
-    /// The crc calculated for the chunk.
+    /// The CRC calculated for the chunk.
     pub crc: u32,
     /// The length of the data contained inside of the chunk.
     pub length: u32,

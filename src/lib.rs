@@ -448,7 +448,7 @@ where
     ///
     /// This call will not interrupt any writers, and will block indefinitely if
     /// another instance of this [`WriteAheadLog`] exists and is not eventually
-    /// dropped. This was is the safest to implement, and because a WAL is
+    /// dropped. This was the safest to implement, and because a WAL is
     /// primarily used in front of another storage layer, it follows that the
     /// shutdown logic of both layers should be synchronized.
     pub fn shutdown(self) -> io::Result<()> {
@@ -588,8 +588,8 @@ where
         if self.bytes_remaining == 0 {
             if self.stored_crc32.is_none() {
                 let mut stored_crc32 = [0; 4];
-                // Bypass our internal read, otherwise our crc would include the
-                // crc read itself.
+                // Bypass our internal read, otherwise our CRC would include the
+                // CRC read itself.
                 self.reader.read_exact(&mut stored_crc32)?;
                 self.stored_crc32 = Some(u32::from_le_bytes(stored_crc32));
             }

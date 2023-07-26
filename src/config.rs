@@ -74,7 +74,7 @@ where
             version_info: Arc::default(),
         }
     }
-    /// Sets the number of bytes to preallocate for each segment file. Returns self.
+    /// Sets the number of bytes to preallocate for each segment file. Returns `self`.
     ///
     /// Preallocating disk space allows for more consistent performance. This
     /// number should be large enough to allow batching multiple entries into
@@ -85,9 +85,9 @@ where
     }
 
     /// Sets the number of bytes written required to begin a checkpoint
-    /// operation. Returns self.
+    /// operation. Returns `self`.
     ///
-    /// This value should be smaller than `preallocate_bytes` tp ensure
+    /// This value should be smaller than `preallocate_bytes` to ensure
     /// checkpoint operations begin before too much data is written in a log
     /// entry. If more data is written before a checkpoint occurs, the segment
     /// will grow to accomodate the extra data, but that write will not be as
@@ -99,7 +99,7 @@ where
     }
 
     /// Sets the number of bytes to use for internal buffers when reading and
-    /// writing data to the log.
+    /// writing data to the log. Returns `self`.
     pub fn buffer_bytes(mut self, bytes: usize) -> Self {
         self.buffer_bytes = bytes;
         self
