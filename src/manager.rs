@@ -40,11 +40,11 @@ where
     /// `checkpointed_entries` can be used to iterate over all entries that are
     /// being checkpointed.
     ///
-    /// Shortly after function returns, the entries stored within the file being
-    /// checkpointed will no longer be accessible. To ensure ACID compliance of
-    /// the underlying storage layer, all necessary changes must be fully
-    /// synchronized to the underlying storage medium before this function call
-    /// returns.
+    /// Shortly after this function returns, the entries stored within the file
+    /// being checkpointed will no longer be accessible. To ensure ACID
+    /// compliance of the underlying storage layer, all necessary changes must
+    /// be fully synchronized to the underlying storage medium before this
+    /// function returns.
     fn checkpoint_to(
         &mut self,
         last_checkpointed_id: EntryId,

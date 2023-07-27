@@ -269,7 +269,7 @@ mod sqlite {
                 // On macOS with built-in SQLite versions, despite the name and the SQLite
                 // documentation, this pragma makes SQLite use `fcntl(_, F_BARRIER_FSYNC,
                 // _)`. There's not a good practical way to make rusqlite's access of SQLite
-                // on macOS to use `F_FULLFSYNC`, which skews benchmarks heavily in favor of
+                // on macOS use `F_FULLFSYNC`, which skews benchmarks heavily in favor of
                 // SQLite when not enabling this feature.
                 //
                 // Enabling this feature reduces the durability guarantees, which breaks

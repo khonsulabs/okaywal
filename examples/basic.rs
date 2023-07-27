@@ -4,7 +4,7 @@ use okaywal::{Entry, EntryId, LogManager, SegmentReader, WriteAheadLog};
 
 fn main() -> io::Result<()> {
     // begin rustme snippet: readme-example
-    // Open a log using an Checkpointer that echoes the information passed into each
+    // Open a log using a Checkpointer that echoes the information passed into each
     // function that the Checkpointer trait defines.
     let log = WriteAheadLog::recover("my-log", LoggingCheckpointer)?;
 
@@ -16,7 +16,7 @@ fn main() -> io::Result<()> {
     let record = writer.write_chunk("this is the first entry".as_bytes())?;
 
     // To fully flush all written bytes to disk and make the new entry
-    // resilliant to a crash, the writer must be committed.
+    // resilient to a crash, the writer must be committed.
     writer.commit()?;
     // end rustme snippet
 

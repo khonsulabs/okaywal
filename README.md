@@ -27,7 +27,7 @@ This crate exposes a WAL that supports:
 ## Basic How-To
 
 [`WriteAheadLog::recover()`](https://khonsulabs.github.io/okaywal/main/okaywal/struct.WriteAheadLog.html#method.recover) is used to create or recover a WAL
-in a given directory. To open a log, an implementator of
+in a given directory. To open a log, an implementer of
 [`LogManager`](https://khonsulabs.github.io/okaywal/main/okaywal/trait.LogManager.html) must be provided. This trait is how
 OkayWAL communicates with your code when recovering or checkpointing a log.
 
@@ -35,7 +35,7 @@ The [basic example][basic-example] shows this process with many comments
 describing how OkayWAL works.
 
 ```rust,ignore
-// Open a log using an Checkpointer that echoes the information passed into each
+// Open a log using a Checkpointer that echoes the information passed into each
 // function that the Checkpointer trait defines.
 let log = WriteAheadLog::recover("my-log", LoggingCheckpointer)?;
 
@@ -47,7 +47,7 @@ let mut writer = log.begin_entry()?;
 let record = writer.write_chunk("this is the first entry".as_bytes())?;
 
 // To fully flush all written bytes to disk and make the new entry
-// resilliant to a crash, the writer must be committed.
+// resilient to a crash, the writer must be committed.
 writer.commit()?;
 ```
 
@@ -180,7 +180,7 @@ After this header, the file is a series of entries, each which contain a series
 of chunks. A byte with a value of 1 signifies a new entry. Any other byte causes
 the reader to stop reading entries from the file.
 
-The first 8 bytes of the entry is the little-endian representation of its
+The first 8 bytes of the entry are the little-endian representation of its
 `EntryId`.
 
 After the `EntryId`, a series of chunks is expected. A byte with a value of 2
@@ -189,10 +189,10 @@ this is the end of the current entry being written. Any other byte causes the
 `SegmentReader` to return an AbortedEntry result. Any already-read chunks from
 this entry should be ignored/rolled back by the `LogManager`.
 
-The first four bytes of a chunk is the data length in little-endian
+The first four bytes of a chunk are the data length in little-endian
 representation. The data for the chunk follows.
 
-Finally, a four-byte crc32 ends the chunk.
+Finally, a four-byte CRC-32 ends the chunk.
 
 If a reader does not encounter a new chunk marker (2) or an end-of-entry marker
 (3), the entry should be considered abandoned and all chunks should be ignored.

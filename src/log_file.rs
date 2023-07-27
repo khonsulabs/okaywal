@@ -487,7 +487,7 @@ where
 
     /// Reads all chunks for this entry. If the entry was completely written,
     /// the list of chunks of data is returned. If the entry wasn't completely
-    /// written, None will be returned.
+    /// written, `None` will be returned.
     pub fn read_all_chunks(&mut self) -> io::Result<Option<Vec<Vec<u8>>>> {
         let mut chunks = Vec::new();
         loop {
@@ -518,7 +518,7 @@ where
     /// An aborted entry was detected. This should only be encountered if log
     /// entries were being written when the computer or application crashed.
     ///
-    /// When is returned, the entire entry should be ignored.
+    /// When this is returned, the entire entry should be ignored.
     AbortedEntry,
 }
 
@@ -566,15 +566,15 @@ where
         self.bytes_remaining
     }
 
-    /// Returns true if the CRC has been validated, or false if the computed crc
-    /// is different than the stored crc. Returns an error if the chunk has not
+    /// Returns true if the CRC has been validated, or false if the computed CRC
+    /// is different than the stored CRC. Returns an error if the chunk has not
     /// been fully read yet.
     pub fn check_crc(&mut self) -> io::Result<bool> {
         if self.bytes_remaining == 0 {
             if self.stored_crc32.is_none() {
                 let mut stored_crc32 = [0; 4];
-                // Bypass our internal read, otherwise our crc would include the
-                // crc read itself.
+                // Bypass our internal read, otherwise our CRC would include the
+                // CRC read itself.
                 self.entry.reader.file.read_exact(&mut stored_crc32)?;
                 self.stored_crc32 = Some(u32::from_le_bytes(stored_crc32));
             }
