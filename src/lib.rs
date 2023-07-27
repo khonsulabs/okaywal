@@ -16,11 +16,11 @@
 use std::{
     collections::{HashMap, VecDeque},
     ffi::OsStr,
-    io::{self, BufReader, ErrorKind, Read, Seek, SeekFrom},
+    io::{self, BufReader, Error, ErrorKind, Read, Seek, SeekFrom},
     path::Path,
     sync::{Arc, Weak},
     thread::JoinHandle,
-    time::Instant,
+    time::{Duration, Instant, SystemTime},
 };
 
 use file_manager::{fs::StdFileManager, FileManager, OpenOptions, PathId};
@@ -78,6 +78,7 @@ where
     config: Configuration<M>,
     checkpoint_sender: flume::Sender<CheckpointCommand<M::File>>,
     checkpoint_thread: Mutex<Option<JoinHandle<io::Result<()>>>>,
+    checkpoint_sync: Condvar,
     readers: Mutex<HashMap<u64, usize>>,
     readers_sync: Condvar,
 }
@@ -184,6 +185,7 @@ where
                 active_sync: Condvar::new(),
                 dirfsync_sync: Condvar::new(),
                 config,
+                checkpoint_sync: Condvar::new(),
                 checkpoint_sender,
                 checkpoint_thread: Mutex::new(None),
                 readers: Mutex::default(),
@@ -234,6 +236,31 @@ where
         drop(files);
 
         EntryWriter::new(self, entry_id, file)
+    }
+
+    pub fn wait_checkpointed_for(&self, entry_id: &EntryId, timeout: Duration) -> io::Result<()> {
+        let time_deadline = Instant::now()
+            .checked_add(timeout)
+            .expect("Couldn't add timeout");
+        let mut files = self.data.files.lock();
+        loop {
+            let last_checkpointed_entry_id = files.last_checkpointed_entry_id;
+            if last_checkpointed_entry_id.is_some()
+                && last_checkpointed_entry_id.unwrap().0 >= entry_id.0
+            {
+                return Ok(());
+            }
+            let result = self
+                .data
+                .checkpoint_sync
+                .wait_until(&mut files, time_deadline);
+            if result.timed_out() {
+                return Err(Error::new(
+                    ErrorKind::TimedOut,
+                    "Entry not checkpointed during timeout.",
+                ));
+            }
+        }
     }
 
     fn reclaim(&self, file: LogFile<M::File>, result: WriteResult) -> io::Result<()> {
@@ -311,14 +338,17 @@ where
                 let synchronize_target = writer.position();
                 writer = file_to_checkpoint.synchronize_locked(writer, synchronize_target)?;
             }
-            if let Some(entry_id) = writer.last_entry_id() {
+            let last_checkpointed_entry_id = if let Some(entry_id) = writer.last_entry_id() {
                 let mut reader =
                     SegmentReader::new(writer.path(), file_id, &wal.data.config.file_manager)?;
                 drop(writer);
                 let mut manager = wal.data.manager.lock();
                 manager.checkpoint_to(entry_id, &mut reader, &wal)?;
                 writer = file_to_checkpoint.lock();
-            }
+                Some(entry_id)
+            } else {
+                None
+            };
 
             // Rename the file to denote that it's been checkpointed.
             let new_name = format!(
@@ -353,6 +383,17 @@ where
 
             let files = wal.data.files.lock();
             let mut files = wal.sync_directory(files, sync_target)?;
+            if let Some(entry_id) = files.last_checkpointed_entry_id {
+                if let Some(last_checkpointed_entry_id) = last_checkpointed_entry_id {
+                    if last_checkpointed_entry_id.0 > entry_id.0 {
+                        files.last_checkpointed_entry_id = Some(last_checkpointed_entry_id);
+                        wal.data.checkpoint_sync.notify_all();
+                    }
+                }
+            } else {
+                files.last_checkpointed_entry_id = last_checkpointed_entry_id;
+                wal.data.checkpoint_sync.notify_all();
+            }
             files.inactive.push_back(file_to_checkpoint);
         }
 
@@ -484,6 +525,7 @@ where
     active: Option<LogFile<F>>,
     inactive: VecDeque<LogFile<F>>,
     last_entry_id: EntryId,
+    last_checkpointed_entry_id: Option<EntryId>,
     directory_synced_at: Option<Instant>,
     directory_is_syncing: bool,
     all: HashMap<u64, LogFile<F>>,
@@ -529,6 +571,7 @@ where
             active: None,
             inactive: VecDeque::new(),
             last_entry_id: EntryId::default(),
+            last_checkpointed_entry_id: None,
             directory_synced_at: None,
             directory_is_syncing: false,
             all: HashMap::new(),

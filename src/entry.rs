@@ -1,4 +1,4 @@
-use std::io::{self, Read, Write};
+use std::io::{self, Error, Read, Write};
 
 use crc32c::crc32c_append;
 use file_manager::FileManager;
@@ -59,6 +59,15 @@ where
         self.id
     }
 
+    pub fn commit_and_checkpoint(self) -> io::Result<EntryId> {
+        let sender = &self.log.data.checkpoint_sender;
+        self.commit_and(move |file| {
+            sender
+                .send(crate::CheckpointCommand::Checkpoint(file))
+                .map_err(|se| Error::new(io::ErrorKind::Other, se.to_string()))
+        })
+    }
+
     /// Commits this entry to the log. Once this call returns, all data is
     /// atomically updated and synchronized to disk.
     ///
@@ -69,7 +78,7 @@ where
         self.commit_and(|_file| Ok(()))
     }
 
-    pub(crate) fn commit_and<F: FnOnce(&mut LogFileWriter<M::File>) -> io::Result<()>>(
+    pub(crate) fn commit_and<F: FnOnce(LogFile<M::File>) -> io::Result<()>>(
         mut self,
         callback: F,
     ) -> io::Result<EntryId> {
@@ -79,7 +88,7 @@ where
 
         writer.write_all(&[END_OF_ENTRY])?;
         let new_length = writer.position();
-        callback(&mut writer)?;
+        callback(file.clone())?;
         writer.set_last_entry_id(Some(self.id));
         drop(writer);
 
