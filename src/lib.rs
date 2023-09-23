@@ -236,23 +236,34 @@ where
         EntryWriter::new(self, entry_id, file)
     }
 
+    /// Checkpoint the currently active file immediately, regardless of its size.
+    ///
+    /// A new logfile is immediately made active for subsequent writes, and the currently
+    /// active logfile is sent to the checkpoint thread for immediate background
+    /// checkpointing.
+    ///
+    /// This call will acquire an exclusive lock to the active file or block
+    /// until it can be acquired.
+    pub fn checkpoint_active(&self) -> io::Result<()> {
+        let mut files = self.data.files.lock();
+        let file = loop {
+            if let Some(file) = files.active.take() {
+                break file;
+            }
+
+            // Wait for a free file
+            self.data.active_sync.wait(&mut files);
+        };
+        drop(files);
+        self.checkpoint_file_and_activate_new(file)?;
+
+        Ok(())
+    }
+
     fn reclaim(&self, file: LogFile<M::File>, result: WriteResult) -> io::Result<()> {
         if let WriteResult::Entry { new_length } = result {
             let last_directory_sync = if self.data.config.checkpoint_after_bytes <= new_length {
-                // Checkpoint this file. This first means activating a new file.
-                let mut files = self.data.files.lock();
-                files.activate_new_file(&self.data.config)?;
-                let last_directory_sync = files.directory_synced_at;
-                drop(files);
-                self.data.active_sync.notify_one();
-
-                // Now, send the file to the checkpointer.
-                self.data
-                    .checkpoint_sender
-                    .send(CheckpointCommand::Checkpoint(file.clone()))
-                    .to_io()?;
-
-                last_directory_sync
+                self.checkpoint_file_and_activate_new(file.clone())?
             } else {
                 // We wrote an entry, but the file isn't ready to be
                 // checkpointed. Return the file to allow more writes to happen
@@ -291,6 +302,26 @@ where
         }
 
         Ok(())
+    }
+
+    fn checkpoint_file_and_activate_new(
+        &self,
+        file: LogFile<M::File>,
+    ) -> io::Result<Option<Instant>> {
+        // Checkpoint this file. This first means activating a new file.
+        let mut files = self.data.files.lock();
+        files.activate_new_file(&self.data.config)?;
+        let last_directory_sync = files.directory_synced_at;
+        drop(files);
+        self.data.active_sync.notify_one();
+
+        // Now, send the file to the checkpointer.
+        self.data
+            .checkpoint_sender
+            .send(CheckpointCommand::Checkpoint(file))
+            .to_io()?;
+
+        Ok(last_directory_sync)
     }
 
     fn checkpoint_thread(

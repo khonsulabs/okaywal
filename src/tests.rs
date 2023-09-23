@@ -125,6 +125,31 @@ fn basic<M: FileManager, P: AsRef<Path>>(manager: M, path: P) {
     reader.read_to_end(&mut buffer).unwrap();
     assert_eq!(buffer, message);
     assert!(reader.crc_is_valid().expect("error validating crc"));
+    drop(reader);
+
+    let mut writer = wal.begin_entry().unwrap();
+    let _ = writer.write_chunk(message).unwrap();
+    let written_entry_id = writer.commit().unwrap();
+
+    wal.checkpoint_active()
+        .expect("Could not checkpoint active log");
+    wal.shutdown().unwrap();
+
+    let invocations = checkpointer.invocations.lock();
+    println!("Invocations: {invocations:?}");
+    assert_eq!(invocations.len(), 3);
+    match &invocations[2] {
+        CheckpointCall::Checkpoint { data } => {
+            let item = data.get(&written_entry_id).expect(&format!(
+                "Could not find checkpointed entry: {:?}",
+                written_entry_id
+            ));
+            assert_eq!(item.len(), 1);
+            assert_eq!(item[0], message);
+        }
+        other => unreachable!("unexpected invocation: {other:?}"),
+    }
+    drop(invocations);
 }
 
 #[test]
