@@ -199,7 +199,7 @@ fn multithreaded() {
         let wal = wal.clone();
         let written_entries = original_entries.clone();
         threads.push(std::thread::spawn(move || {
-            let rng = fastrand::Rng::new();
+            let mut rng = fastrand::Rng::new();
             for _ in 1..10 {
                 let mut messages = Vec::with_capacity(rng.usize(1..=8));
                 let mut writer = wal.begin_entry().unwrap();
