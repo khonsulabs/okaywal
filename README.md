@@ -197,13 +197,13 @@ Finally, a four-byte crc32 ends the chunk.
 If a reader does not encounter a new chunk marker (2) or an end-of-entry marker
 (3), the entry should be considered abandoned and all chunks should be ignored.
 
-[basic-example]: https://github.com/khonsulabs/okaywal/blob/v0.0.0/examples/basic.rs
+[basic-example]: https://github.com/khonsulabs/okaywal/blob/v0.3.0/examples/basic.rs
 [wal]: https://en.wikipedia.org/wiki/Write-ahead_logging
 
 ## Open-source Licenses
 
-This project, like all projects from [Khonsu Labs](https://khonsulabs.com/), are
-open-source. This repository is available under the [MIT License](./LICENSE-MIT)
-or the [Apache License 2.0](./LICENSE-APACHE).
+This project, like all projects from [Khonsu Labs](https://khonsulabs.com/), is open-source.
+This repository is available under the [MIT License](./LICENSE-MIT) or the
+[Apache License 2.0](./LICENSE-APACHE).
 
 To learn more about contributing, please see [CONTRIBUTING.md](./CONTRIBUTING.md).
