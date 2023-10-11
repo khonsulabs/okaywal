@@ -1,6 +1,6 @@
 [package]
 name = "okaywal"
-version = "0.2.0"
+version = "0.3.0"
 license = "MIT OR Apache-2.0"
 edition = "2021"
 description = "An okay Write-Ahead Log implementation"
@@ -13,13 +13,13 @@ rust-version = "1.58"
 [dependencies]
 parking_lot = "0.12.1"
 crc32c = "0.6.3"
-flume = "0.10.14"
+flume = "0.11.0"
 tracing = { version = "0.1.36", optional = true }
 file-manager = { git = "https://github.com/khonsulabs/file-manager", branch = "main" }
 
 [dev-dependencies]
 tempfile = "3.3.0"
-fastrand = "1.8.0"
+fastrand = "2.0.1"
 
 [workspace]
 members = ["benchmarks", "xtask"]
