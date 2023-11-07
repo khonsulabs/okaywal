@@ -364,7 +364,7 @@ where
             writer.rename(&new_name)?;
             drop(writer);
 
-            // Now, read attemps will fail, but any current readers are still
+            // Now, read attempts will fail, but any current readers are still
             // able to read the data. Before we truncate the file, we need to
             // wait for all existing readers to close.
             let mut readers = wal.data.readers.lock();

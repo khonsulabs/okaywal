@@ -90,7 +90,7 @@ where
     /// This value should be smaller than `preallocate_bytes` to ensure
     /// checkpoint operations begin before too much data is written in a log
     /// entry. If more data is written before a checkpoint occurs, the segment
-    /// will grow to accomodate the extra data, but that write will not be as
+    /// will grow to accommodate the extra data, but that write will not be as
     /// fast due to needing to allocate more space from the filesystem to
     /// perform the write.
     pub fn checkpoint_after_bytes(mut self, bytes: u64) -> Self {
