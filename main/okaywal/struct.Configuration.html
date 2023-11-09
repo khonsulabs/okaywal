@@ -47,7 +47,7 @@ operation. Returns <code>self</code>.</p>
 <p>This value should be smaller than <code>preallocate_bytes</code> to ensure
 checkpoint operations begin before too much data is written in a log
 entry. If more data is written before a checkpoint occurs, the segment
-will grow to accomodate the extra data, but that write will not be as
+will grow to accommodate the extra data, but that write will not be as
 fast due to needing to allocate more space from the filesystem to
 perform the write.</p>
 </div></details><details class="toggle method-toggle" open><summary><section id="method.buffer_bytes" class="method"><a class="src rightside" href="../src/okaywal/config.rs.html#103-106">source</a><h4 class="code-header">pub fn <a href="#method.buffer_bytes" class="fn">buffer_bytes</a>(self, bytes: <a class="primitive" href="https://doc.rust-lang.org/1.73.0/std/primitive.usize.html">usize</a>) -&gt; Self</h4></section></summary><div class="docblock"><p>Sets the number of bytes to use for internal buffers when reading and

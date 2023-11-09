@@ -1035,7 +1035,7 @@
             writer.rename(<span class="kw-2">&amp;</span>new_name)<span class="question-mark">?</span>;
             drop(writer);
 
-            <span class="comment">// Now, read attemps will fail, but any current readers are still
+            <span class="comment">// Now, read attempts will fail, but any current readers are still
             // able to read the data. Before we truncate the file, we need to
             // wait for all existing readers to close.
             </span><span class="kw">let </span><span class="kw-2">mut </span>readers = wal.data.readers.lock();
