@@ -330,3 +330,36 @@ fn always_checkpointing() {
         assert_eq!(chunk_data[0], index.to_be_bytes());
     }
 }
+
+#[test]
+fn recover_after_first_rollback() {
+    let dir = tempdir().unwrap();
+    let checkpointer = LoggingCheckpointer::default();
+    let log = WriteAheadLog::recover(&dir, checkpointer.clone()).unwrap();
+
+    // this entry is rolled back
+    log.begin_entry().unwrap();
+
+    let mut entry = log.begin_entry().unwrap();
+    let expected_id = entry.id();
+    entry.write_chunk(b"test").unwrap();
+    entry.commit().unwrap();
+
+    log.shutdown().unwrap();
+
+    WriteAheadLog::recover(&dir, checkpointer.clone()).unwrap();
+
+    let invocations = checkpointer.invocations.lock();
+    println!("Invocations: {invocations:?}");
+    assert_eq!(invocations.len(), 2);
+    assert!(matches!(
+        invocations[0],
+        CheckpointCall::ShouldRecoverSegment { .. }
+    ));
+    let CheckpointCall::Recover { entry_id, data } = &invocations[1] else {
+        unreachable!()
+    };
+    assert_eq!(*entry_id, expected_id);
+    assert_eq!(data.len(), 1);
+    assert_eq!(data[0], b"test");
+}

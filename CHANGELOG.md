@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.3.1
+
+### Fixed
+
+- Rolling back the first entry of a log file caused its data to become skipped
+  during recovery due to a small logic bug that rewrote the file's header if no
+  entries had been fsynced. Thanks to @losfair for the succinct test case in
+  issue [#14][14].
+
+[14]: https://github.com/khonsulabs/okaywal/issues/14
+
 ## v0.3.0
 
 ### Added
