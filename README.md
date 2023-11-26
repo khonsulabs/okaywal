@@ -197,7 +197,7 @@ Finally, a four-byte crc32 ends the chunk.
 If a reader does not encounter a new chunk marker (2) or an end-of-entry marker
 (3), the entry should be considered abandoned and all chunks should be ignored.
 
-[basic-example]: https://github.com/khonsulabs/okaywal/blob/v0.3.0/examples/basic.rs
+[basic-example]: https://github.com/khonsulabs/okaywal/blob/v0.3.1/examples/basic.rs
 [wal]: https://en.wikipedia.org/wiki/Write-ahead_logging
 
 ## Open-source Licenses

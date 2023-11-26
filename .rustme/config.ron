@@ -33,7 +33,7 @@ Configuration(
             ),
             "src-base": (
                 default: "https://github.com/khonsulabs/okaywal/blob/main",
-                release: "https://github.com/khonsulabs/okaywal/blob/v0.3.0",
+                release: "https://github.com/khonsulabs/okaywal/blob/v0.3.1",
             ),
             "logmanager-trait": (
                 default: "https://khonsulabs.github.io/okaywal/main/okaywal/trait.LogManager.html",
