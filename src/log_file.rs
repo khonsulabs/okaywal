@@ -245,7 +245,7 @@ where
         if self.synchronized_through > length {
             self.synchronized_through = length;
         }
-        if self.synchronized_through == 0 {
+        if length == 0 {
             Self::write_header(&mut self.file, &self.version_info)?;
             self.last_entry_id = None;
         }
